@@ -5,11 +5,14 @@
 #include <display/Screen.h>
 #include <iostream>
 #include <string>
+#define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
 #define S_CAST(win) static_cast<Screen*>(glfwGetWindowUserPointer(win))
 
 char const* gl_error_string(GLenum const err) noexcept;
+
+extern bool UsingVulkan;
 
 bool Screen::Loop() {
     window = glfwCreateWindow(800, 600, "asdf", nullptr, nullptr);
@@ -20,9 +23,11 @@ bool Screen::Loop() {
     }
     glfwMakeContextCurrent(window);
 
-    if(!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)) {
-        std::cout << "Failed to initialize GLAD" << std::endl;
-        return false;
+    if(!UsingVulkan) {
+        if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)) {
+            std::cout << "Failed to initialize GLAD" << std::endl;
+            return false;
+        }
     }
 
     glfwSetWindowUserPointer(window, this);
