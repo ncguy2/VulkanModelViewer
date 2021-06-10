@@ -12,8 +12,6 @@
 
 char const* gl_error_string(GLenum const err) noexcept;
 
-extern bool UsingVulkan;
-
 bool Screen::Loop() {
     window = glfwCreateWindow(800, 600, "asdf", nullptr, nullptr);
     if(window == nullptr) {
@@ -22,13 +20,6 @@ bool Screen::Loop() {
         return false;
     }
     glfwMakeContextCurrent(window);
-
-    if(!UsingVulkan) {
-        if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)) {
-            std::cout << "Failed to initialize GLAD" << std::endl;
-            return false;
-        }
-    }
 
     glfwSetWindowUserPointer(window, this);
     glfwSetFramebufferSizeCallback(window, [](GLFWwindow* win, int w, int h) { S_CAST(win)->Resize(w, h); });
@@ -69,6 +60,10 @@ void Screen::CheckErrors() {
         std::cout << "Error: " << gl_error_string(error) << std::endl;
         error = glGetError();
     }
+}
+Screen::~Screen() {
+    glfwDestroyWindow(window);
+    window = nullptr;
 }
 
 char const* gl_error_string(GLenum const err) noexcept {

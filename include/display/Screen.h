@@ -11,6 +11,8 @@ class GLFWwindow;
 
 class Screen {
 public:
+    virtual ~Screen();
+
     bool Loop();
     virtual void Resize(int width, int height);
     virtual void OnKey(int key, int scancode, int action, int mods);

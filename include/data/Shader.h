@@ -6,20 +6,33 @@
 #define GLMODELVIEWER_SHADER_H
 
 #include <string>
+#include <vector>
 
-class ShaderProgram {
+#include "ShaderStage.h"
+#include <vulkan/vulkan.hpp>
+
+
+class AbstractShaderProgram {
+};
+
+class ShaderProgram : public AbstractShaderProgram {
 public:
-    virtual ~ShaderProgram();
+    ShaderProgram(vk::Device *device);
+    void Compile(vk::Extent2D swapchainExtent, vk::Format imageFormat);
+    void Cleanup();
 
-    void SetVertexSource(const char* source);
-    void SetFragmentSource(const char* source);
+    void AddStage(std::shared_ptr<ShaderStage> stage);
 
-    void Compile();
-    void Bind();
 protected:
-    unsigned int shaderProgram;
-    const char* vertexSource;
-    const char* fragmentSource;
+    void BuildRenderPass(vk::Format imageFormat);
+    void BuildPipeline(vk::Extent2D extent);
+
+    vk::Device* device;
+    std::vector<std::shared_ptr<ShaderStage>> shaderStages;
+    vk::PipelineLayout pipelineLayout;
+    vk::Pipeline pipeline;
+    vk::RenderPass renderPass;
+
 };
 
 #endif//GLMODELVIEWER_SHADER_H

@@ -5,7 +5,7 @@
 #include <pch.h>
 #include <display/SimpleScreen.h>
 
-VERTEX_ATTRIBUTES()
+//VERTEX_ATTRIBUTES()
 
 void SimpleScreen::Setup() {
     const char* vertexShaderSource = "#version 330 core\n"
@@ -25,8 +25,8 @@ void SimpleScreen::Setup() {
                                        "   FragColour = vec4(Colour, 1.0f);\n"
                                        "}\0";
 
-    shader.SetVertexSource(vertexShaderSource);
-    shader.SetFragmentSource(fragmentShaderSource);
+//    shader.SetVertexSource(vertexShaderSource);
+//    shader.SetFragmentSource(fragmentShaderSource);
     shader.Compile();
 
     std::vector<float> v = {
@@ -39,18 +39,18 @@ void SimpleScreen::Setup() {
             0, 1, 3,
             1, 2, 3
     };
-    mesh.SetVertices(v);
-    mesh.SetIndices(i);
-    mesh.AddAttribute(VertexAttributes::Vertex);
-    mesh.AddAttribute(VertexAttributes::Colour);
-    mesh.Initialize();
+//    mesh.SetVertices(v);
+//    mesh.SetIndices(i);
+//    mesh.AddAttribute(VertexAttributes::Vertex);
+//    mesh.AddAttribute(VertexAttributes::Colour);
+//    mesh.Initialize();
 }
 
 void SimpleScreen::Render() {
     glClearColor(.2f, .3f, .3f, 1);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    shader.Bind();
-    mesh.Draw();
+//    shader.Bind();
+//    mesh.Draw();
 
 }

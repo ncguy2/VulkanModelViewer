@@ -3,83 +3,47 @@
 //
 
 #include <data/Mesh.h>
-#include <glad/glad.h>
-#include <iostream>
-#include <string>
-#include <utility>
+#include <core/VulkanCore.hpp>
 
-void Mesh::Initialize() {
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
+void Mesh::SetVertices(std::vector<Vertex> vertices) {
+    this->vertices = vertices;
+}
 
-    glBindVertexArray(VAO);
+std::vector<Vertex> Mesh::GetVertices() {
+    return this->vertices;
+}
 
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * VertexCount, Vertices, GL_STATIC_DRAW);
+void Mesh::CreateVertexBuffer(VulkanCore* core, vk::Device* device) {
+    devicePtr = device;
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * IndexCount, Indices, GL_STATIC_DRAW);
+    vk::BufferCreateInfo bufferInfo{};
+    bufferInfo.size = sizeof(vertices[0]) * vertices.size();
+    bufferInfo.usage = vk::BufferUsageFlagBits::eVertexBuffer;
+    bufferInfo.sharingMode = vk::SharingMode::eExclusive;
 
-    unsigned int id = 0;
-    unsigned int offset = 0;
-    int size;
+    if(device->createBuffer(&bufferInfo, nullptr, &vertexBuffer) != vk::Result::eSuccess)
+        throw std::runtime_error("Unable to create vertex buffer");
 
-    int stride = 0;
-    for (const VertexAttribute &attr : Attributes) {
-        stride += attr.count * attr.typeSize;
+    core->AllocateMemory(vertexBuffer, &bufferMemory);
+
+    void* data;
+    if(device->mapMemory(bufferMemory, 0, bufferInfo.size, (vk::MemoryMapFlags) 0, &data) != vk::Result::eSuccess)
+        throw std::runtime_error("Unable to map devicememory");
+    memcpy(data, vertices.data(), bufferInfo.size);
+    device->unmapMemory(bufferMemory);
+}
+
+vk::Buffer Mesh::GetVertexBuffer() {
+    return vertexBuffer;
+}
+
+uint32_t Mesh::GetVertexCount() {
+    return vertices.size();
+}
+
+void Mesh::Dispose() {
+    if(devicePtr) {
+        devicePtr->destroyBuffer(vertexBuffer);
+        devicePtr->freeMemory(bufferMemory);
     }
-
-    for (const VertexAttribute &attr : Attributes) {
-        std::cout << attr.name << " at offset " << std::to_string(offset) << std::endl;
-        glVertexAttribPointer(id, attr.count, attr.type, attr.normalised, stride, (void*) offset);
-        glEnableVertexAttribArray(id);
-
-        offset += attr.count * attr.typeSize;
-        id++;
-    }
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-}
-
-void Mesh::SetVertices(float* data, unsigned int count) {
-    this->Vertices = data;
-    this->VertexCount = count;
-}
-
-void Mesh::SetIndices(unsigned int *data, unsigned int count) {
-    this->Indices = data;
-    this->IndexCount = count;
-}
-
-void Mesh::Bind() {
-    glBindVertexArray(VAO);
-}
-
-void Mesh::Draw() {
-    glBindVertexArray(VAO);
-//    glDrawArrays(GL_TRIANGLES, 0, 3);
-    glDrawElements(GL_TRIANGLES, IndexCount, GL_UNSIGNED_INT, 0);
-}
-
-Mesh::~Mesh() {
-    glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
-    glDeleteBuffers(1, &EBO);
-    delete this->Vertices;
-}
-
-void Mesh::SetVertices(std::vector<float> data) {
-    this->VertexCount = data.size();
-    this->Vertices = new float[VertexCount];
-    std::copy(data.begin(), data.end(), this->Vertices);
-}
-void Mesh::SetIndices(std::vector<unsigned int> data) {
-    this->IndexCount = data.size();
-    this->Indices = new unsigned int[IndexCount];
-    std::copy(data.begin(), data.end(), this->Indices);
-}
-void Mesh::AddAttribute(VertexAttribute attr) {
-    Attributes.push_back(attr);
 }

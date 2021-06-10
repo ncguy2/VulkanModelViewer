@@ -1,30 +1,60 @@
 #include <iostream>
+#include <cstring>
 
 #include <display/SimpleScreen.h>
+
+#define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+#include <core/VulkanCore.hpp>
 #include <glad/glad.h>
+#include <string>
 
-bool UsingVulkan = false;
-
-void initGL() {
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+#ifdef WIN32
+#include <windows.h>
+std::string cwd() {
+    char buf[256];
+    GetCurrentDirectoryA(256, buf);
+    return std::string(buf) + '\\';
 }
+#endif
 
-void initVulkan() {
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-}
+std::string EXE_PATH;
+std::string CWD;
 
-int main() {
-    glfwInit();
+int main(int _, char** argv) {
+    EXE_PATH = std::string(argv[0]);
+    CWD = cwd();
+    std::cout << "EXE Path: " << EXE_PATH.c_str() << std::endl;
+    std::cout << "CWD: " << CWD.c_str() << std::endl;
 
-//    initGL();
-    initVulkan();
+    VulkanCore core;
 
-    SimpleScreen s;
-    s.Loop();
+    std::shared_ptr<Mesh> mesh = std::make_shared<Mesh>();
 
-    glfwTerminate();
+    /*
+     *     vec2(0.0, -0.5),
+    vec2(0.5, 0.5),
+    vec2(-0.5, 0.5)
+     */
+
+    mesh->SetVertices({
+            Vertex({  0.0f, -0.5f,  0.0f }, { 1.0f, 0.0f, 0.0f }),
+            Vertex({  0.5f,  0.5f,  0.0f }, { 0.0f, 1.0f, 0.0f }),
+            Vertex({  -0.5f,  0.5f,  0.0f }, { 0.0f, 0.0f, 1.0f }),
+
+//            {{  0.0f,  0.5f,  0.0f }, { 1.0f, 0.0f, 0.0f }},
+//            {{  0.5f, -0.5f,  0.0f }, { 0.0f, 1.0f, 0.0f }},
+//            {{  -0.5f, -0.5f,  0.0f }, { 0.0f, 0.0f, 1.0f }}
+    });
+    core.AddMesh(mesh);
+
+    core.InitVulkan();
+
+    core.MainLoop();
+
+//    SimpleScreen s;
+//    s.Loop();
+
+    core.Cleanup();
     return 0;
 }
