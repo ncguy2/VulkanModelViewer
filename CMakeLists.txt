@@ -10,16 +10,17 @@ message("CMAKE_MODULE_PATH: ${CMAKE_MODULE_PATH}")
 add_subdirectory(external/glfw-3.3.4)
 find_package(Vulkan REQUIRED FATAL_ERROR)
 
-set(EXTERNAL_SOURCES ${EXTERNAL_SOURCES} external/glad/src/glad.c)
+set(EXTERNAL_SOURCES ${EXTERNAL_SOURCES} external/glad/src/glad.c external/stb/lib/stb_image.cpp)
 
 include_directories(external/gl.hpp/include)
 include_directories(external/glad/include)
 include_directories(external/glfw-3.3.4/include)
+include_directories(external/stb/include)
 include_directories(external/glm)
 
 include_directories(include)
-set(HEADERS include/display/Screen.h include/display/SimpleScreen.h include/data/Mesh.h include/data/Shader.h include/data/VertexAttribute.h include/pch.h include/core/VulkanCore.hpp include/data/ShaderStage.h)
-set(SOURCES lib/display/Screen.cpp lib/display/SimpleScreen.cpp lib/data/Mesh.cpp lib/data/Shader.cpp lib/data/VertexAttribute.cpp lib/core/VulkanCore.cpp lib/data/ShaderStage.cpp)
+set(HEADERS include/display/Screen.h include/display/SimpleScreen.h include/data/Mesh.h include/data/Shader.h include/data/VertexAttribute.h include/pch.h include/core/VulkanCore.hpp include/data/ShaderStage.h include/data/vk/CommandBuffer.h include/core/Events.h include/data/Texture.h include/data/TextureSampler.h)
+set(SOURCES lib/display/Screen.cpp lib/display/SimpleScreen.cpp lib/data/Mesh.cpp lib/data/Shader.cpp lib/data/VertexAttribute.cpp lib/core/VulkanCore.cpp lib/data/ShaderStage.cpp lib/data/vk/CommandBuffer.cpp lib/data/Texture.cpp lib/data/TextureSampler.cpp)
 
 add_executable(GLModelViewer main.cpp ${SOURCES} ${HEADERS} ${EXTERNAL_SOURCES})
 

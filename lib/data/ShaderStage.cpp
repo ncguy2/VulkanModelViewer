@@ -50,3 +50,4 @@ void ShaderStage::Cleanup(vk::Device *device) {
     device->destroyShaderModule(module);
     moduleActive = false;
 }
+ShaderStage::ShaderStage(const std::string &name, vk::ShaderStageFlagBits stageFlag, const std::vector<char> &source) : name(name), stageFlag(stageFlag), source(source) {}

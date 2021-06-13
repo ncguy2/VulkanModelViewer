@@ -27,7 +27,7 @@ void SimpleScreen::Setup() {
 
 //    shader.SetVertexSource(vertexShaderSource);
 //    shader.SetFragmentSource(fragmentShaderSource);
-    shader.Compile();
+//    shader.Compile();
 
     std::vector<float> v = {
              0.5f,  0.5f, 0.0f,  1.0f,  1.0f, 1.0f,

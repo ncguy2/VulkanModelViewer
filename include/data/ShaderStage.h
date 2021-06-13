@@ -9,9 +9,12 @@
 
 class ShaderStage {
 public:
-    void SetSource(std::vector<char> source);
-    void SetStage(vk::ShaderStageFlagBits stageFlag);
+    ShaderStage() = default;
+    ShaderStage(const std::string &name, vk::ShaderStageFlagBits stageFlag, const std::vector<char> &source);
+
     void SetName(std::string name);
+    void SetStage(vk::ShaderStageFlagBits stageFlag);
+    void SetSource(std::vector<char> source);
 
     const vk::ShaderStageFlagBits &getStageFlag() const;
     const std::vector<char> &getSource() const;
@@ -21,9 +24,9 @@ public:
     void Cleanup(vk::Device* device);
 
 protected:
+    std::string name;
     vk::ShaderStageFlagBits stageFlag;
     std::vector<char> source;
-    std::string name;
     bool moduleActive;
     vk::ShaderModule module;
 };

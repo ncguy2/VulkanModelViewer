@@ -6,12 +6,10 @@
 #define GLMODELVIEWER_PCH_H
 
 
-#define VERTEX_ATTRIBUTES() \
-    namespace VertexAttributes { \
-        extern VertexAttribute Vertex; \
-        extern VertexAttribute Normal; \
-        extern VertexAttribute Colour; \
-        extern VertexAttribute TexCoords; \
-    }
+#ifdef NDEBUG
+#define CHECK(x) x
+#else
+#define CHECK(x) if(x != vk::Result::eSuccess) throw std::runtime_error(#x);
+#endif
 
 #endif//GLMODELVIEWER_PCH_H
