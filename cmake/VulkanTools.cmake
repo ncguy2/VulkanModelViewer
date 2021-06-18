@@ -22,3 +22,7 @@ function(target_add_shader TARGET SHADER)
     set_source_files_properties(${current-output-path} PROPERTIES GENERATED TRUE)
     target_sources(${TARGET} PRIVATE ${current-output-path})
 endfunction(target_add_shader)
+
+function(target_add_parser TARGET PARSER)
+    # TODO Add build-level integration for kaitai-struct-compile.bat
+endfunction(target_add_parser)

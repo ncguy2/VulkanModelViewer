@@ -50,59 +50,11 @@ void ShaderProgram::AddStage(ShaderStage stage) {
     stageAdded(this, stage);
 }
 
-void ShaderProgram::Compile(vk::Extent2D &swapchainExtent, vk::Format &imageFormat, vk::DescriptorPool &descriptorPool) {
-    BuildRenderPass(imageFormat);
+void ShaderProgram::Compile(vk::Extent2D &swapchainExtent, vk::Format &imageFormat, vk::DescriptorPool &descriptorPool, vk::RenderPass& renderPass) {
     BuildDescriptorSetLayout();
     BuildDescriptorSets(descriptorPool, core->ImageCount(), core->GetUniformBuffers());
-    BuildPipeline(swapchainExtent);
+    BuildPipeline(swapchainExtent, renderPass);
     isCompiled = true;
-}
-
-void ShaderProgram::BuildRenderPass(vk::Format &imageFormat) {
-    vk::AttachmentDescription colourAttachment{};
-    colourAttachment.setFormat(imageFormat);
-    colourAttachment.setSamples(vk::SampleCountFlagBits::e1);
-    colourAttachment.setLoadOp(vk::AttachmentLoadOp::eClear);
-    colourAttachment.setStoreOp(vk::AttachmentStoreOp::eStore);
-    colourAttachment.setStencilLoadOp(vk::AttachmentLoadOp::eDontCare);
-    colourAttachment.setStencilStoreOp(vk::AttachmentStoreOp::eDontCare);
-    colourAttachment.setInitialLayout(vk::ImageLayout::eUndefined);
-    colourAttachment.setFinalLayout(vk::ImageLayout::ePresentSrcKHR);
-
-    vk::AttachmentReference colourAttachmentRef{};
-    colourAttachmentRef.setAttachment(0);
-    colourAttachmentRef.setLayout(vk::ImageLayout::eColorAttachmentOptimal);
-
-    vk::SubpassDescription subpass{};
-    subpass.setPipelineBindPoint(vk::PipelineBindPoint::eGraphics);
-    subpass.setColorAttachmentCount(1);
-    subpass.setPColorAttachments(&colourAttachmentRef);
-
-    vk::SubpassDependency dependencies[2];
-    dependencies[0].setSrcSubpass(VK_SUBPASS_EXTERNAL);
-    dependencies[0].setDstSubpass(0);
-    dependencies[0].setSrcStageMask(vk::PipelineStageFlagBits::eBottomOfPipe);
-    dependencies[0].setDstStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
-    dependencies[0].setSrcAccessMask(vk::AccessFlagBits::eMemoryRead);
-    dependencies[0].setDstAccessMask(vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite);
-
-    dependencies[1].setSrcSubpass(0);
-    dependencies[1].setDstSubpass(VK_SUBPASS_EXTERNAL);
-    dependencies[1].setSrcStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
-    dependencies[1].setDstStageMask(vk::PipelineStageFlagBits::eBottomOfPipe);
-    dependencies[1].setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite);
-    dependencies[1].setDstAccessMask(vk::AccessFlagBits::eMemoryRead);
-
-    vk::RenderPassCreateInfo renderPassInfo{};
-    renderPassInfo.setAttachmentCount(1);
-    renderPassInfo.setPAttachments(&colourAttachment);
-    renderPassInfo.setSubpassCount(1);
-    renderPassInfo.setPSubpasses(&subpass);
-    renderPassInfo.setDependencyCount(2);
-    renderPassInfo.setPDependencies(dependencies);
-
-    if (device->createRenderPass(&renderPassInfo, nullptr, &renderPass) != vk::Result::eSuccess)
-        throw std::runtime_error("Failed to create render pass");
 }
 
 void ShaderProgram::BuildDescriptorSetLayout() {
@@ -182,7 +134,7 @@ void ShaderProgram::BuildDescriptorSets(vk::DescriptorPool &descriptorPool, int 
     }
 }
 
-void ShaderProgram::BuildPipeline(vk::Extent2D &extent) {
+void ShaderProgram::BuildPipeline(vk::Extent2D &extent, vk::RenderPass& renderPass) {
     std::vector<vk::PipelineShaderStageCreateInfo> infoVector;
     vk::PipelineShaderStageCreateInfo *shaderStageInfos;
     for (auto &item : shaderStages)
@@ -259,6 +211,14 @@ void ShaderProgram::BuildPipeline(vk::Extent2D &extent) {
     pipelineLayoutInfo.setSetLayoutCount(1);
     pipelineLayoutInfo.setPSetLayouts(&descriptorSetLayout);
 
+    vk::PushConstantRange pushConstantInfo{};
+    pushConstantInfo.offset = 0;
+    pushConstantInfo.size = sizeof(MeshVertexPushConstants);
+    pushConstantInfo.stageFlags = vk::ShaderStageFlagBits::eVertex;
+
+    pipelineLayoutInfo.pushConstantRangeCount = 1;
+    pipelineLayoutInfo.pPushConstantRanges = &pushConstantInfo;
+
     if (device->createPipelineLayout(&pipelineLayoutInfo, nullptr, &pipelineLayout) != vk::Result::eSuccess)
         throw std::runtime_error("Failed to create pipeline layout");
 
@@ -314,4 +274,12 @@ void ShaderProgram::SetTexture(Texture texture, int index) {
 void ShaderProgram::SetTexture(vk::ImageView imageView, int index) {
     textures[index] = imageView;
     textureBound(this, imageView, index);
+}
+vk::PipelineLayout &ShaderProgram::GetLayout() {
+    return pipelineLayout;
+}
+void ShaderProgram::Recompile(VulkanCore* core) {
+    device->destroyDescriptorSetLayout(descriptorSetLayout);
+
+    core->CompileShader(this);
 }

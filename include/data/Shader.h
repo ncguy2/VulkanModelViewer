@@ -15,8 +15,13 @@
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.hpp>
 
-struct UniformBufferObject {
+struct MeshVertexPushConstants {
     glm::mat4 model;
+    glm::vec4 data;
+};
+
+struct UniformBufferObject {
+//    glm::mat4 model;
     glm::mat4 view;
     glm::mat4 proj;
 };
@@ -43,7 +48,7 @@ public:
     static const int MAX_TEXTURE_SAMPLERS = 16;
 
     ShaderProgram(VulkanCore* core, vk::Device& device);
-    void Compile(vk::Extent2D& swapchainExtent, vk::Format& imageFormat, vk::DescriptorPool& descriptorPool);
+    void Compile(vk::Extent2D& swapchainExtent, vk::Format& imageFormat, vk::DescriptorPool& descriptorPool, vk::RenderPass& renderPass);
     void Cleanup();
 
     void AddStage(ShaderStage stage);
@@ -51,16 +56,18 @@ public:
     vk::Pipeline* GetPipeline();
 
     void BindDescriptorSet(vk::CommandBuffer& buffer, vk::PipelineBindPoint bindPoint, unsigned int imageIndex);
+    void Recompile(VulkanCore* core);
     void AddSampler();
     void AddSamplers(int amt);
     void SetTexture(vk::ImageView imageView, int index);
     void SetTexture(Texture texture, int index);
 
+    vk::PipelineLayout& GetLayout();
+
 protected:
-    void BuildRenderPass(vk::Format& imageFormat);
     void BuildDescriptorSetLayout();
     void BuildDescriptorSets(vk::DescriptorPool& descriptorPool, int imageCount, std::vector<vk::Buffer> uniformBuffers);
-    void BuildPipeline(vk::Extent2D& extent);
+    void BuildPipeline(vk::Extent2D& extent, vk::RenderPass& renderPass);
 
     VulkanCore* core;
     vk::Device* device;
@@ -69,7 +76,6 @@ protected:
     vk::DescriptorSetLayout descriptorSetLayout;
     vk::PipelineLayout pipelineLayout;
     vk::Pipeline pipeline;
-    vk::RenderPass renderPass;
     std::vector<vk::DescriptorSet> descriptorSets;
 
     std::vector<TextureSampler> samplers;

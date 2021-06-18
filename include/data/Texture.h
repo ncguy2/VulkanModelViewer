@@ -16,6 +16,7 @@ public:
 
     void LoadFromFile(const char* file, bool hasAlpha = true);
     void Create(int size, void* data = nullptr);
+    void Set(vk::Image& image);
 
     void SetSize(int width, int height);
 
@@ -23,6 +24,7 @@ public:
     vk::Image& GetImage();
 
     vk::ImageUsageFlags usageFlags;
+    vk::Format format;
 
 protected:
     void CreateView();
@@ -35,11 +37,11 @@ protected:
     int texChannels;
 
     vk::DeviceSize imageSize;
-    vk::Format format;
     vk::Image textureImage;
     vk::DeviceMemory textureImageMemory;
     vk::ImageView textureView;
     vk::ImageAspectFlags aspectFlags;
+    bool manageMemory = true;
 };
 
 #endif//GLMODELVIEWER_TEXTURE_H

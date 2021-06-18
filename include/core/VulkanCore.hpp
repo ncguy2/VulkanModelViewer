@@ -6,10 +6,12 @@
 #define GLMODELVIEWER_VULKANCORE_HPP
 
 #include <core/Events.h>
+#include <data/RenderPass.h>
 #include <data/Shader.h>
+#include <glm/glm.hpp>
 #include <optional>
 #include <vulkan/vulkan.hpp>
-#include <glm/glm.hpp>
+#include <chrono>
 
 struct QueueFamilyIndices {
     std::optional<uint32_t> graphicsFamily;
@@ -28,6 +30,7 @@ struct SwapChainSupportDetails {
 
 class GLFWwindow;
 class Mesh;
+class Screen;
 
 class VulkanCore {
 public:
@@ -50,7 +53,6 @@ public:
     bool framebufferResized = false;
 
     void CreateBuffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties, vk::Buffer& buffer, vk::DeviceMemory& bufferMemory);
-    void AddMesh(std::shared_ptr<Mesh> mesh);
 
     void CopyBuffer(vk::Buffer srcBuffer, vk::Buffer dstBuffer, vk::DeviceSize size);
     void DestroyBuffer(vk::Buffer& buffer, vk::DeviceMemory& bufferMemory);
@@ -75,6 +77,14 @@ public:
     void CompileShader(ShaderProgram* shaderPtr);
     std::shared_ptr<Texture> CreateTexture(vk::Format format, vk::ImageAspectFlags aspectFlags);
 
+    void OnKey(int key, int scancode, int action, int mods);
+    Delegate<VulkanCore*, int, int, int, int> onKey;
+    void RecreateCommandBuffer();
+    GLFWwindow* window;
+
+    void SetScreen(std::shared_ptr<Screen> newScreenPtr);
+    void SetViewProj(uint32_t currentImage, glm::mat4& view, glm::mat4& proj);
+
 protected:
     void CreateInstance();
     std::vector<const char*> getRequiredExtensions();
@@ -92,10 +102,7 @@ protected:
     vk::PresentModeKHR ChooseSwapPresentMode(const std::vector<vk::PresentModeKHR>& availablePresentModes);
     vk::Extent2D ChooseSwapExtent(const vk::SurfaceCapabilitiesKHR& capabilities);
     void CreateSwapChain();
-    void CreateImageViews();
     void CreateGraphicsPipeline();
-    void CreateRenderPass();
-    void CreateFramebuffers();
     void CreateCommandPool();
     void CreateCommandBuffers();
     void CreateSyncObjects();
@@ -105,7 +112,9 @@ protected:
     void CreateDescriptorPool();
     void CreateDepthResources();
     void CleanupCommandBuffers();
-    void RecreateStaticCommandBuffer();
+    void RecordCommandBuffers(int idx);
+
+    void CreateRenderPass();
 
     void UpdateUniformBuffer(uint32_t currentImage);
 
@@ -118,6 +127,7 @@ protected:
     vk::ShaderModule CreateShaderModule(const std::string& file);
     vk::ShaderModule CreateShaderModule(std::vector<char> source);
 
+    vk::DispatchLoaderDynamic dynamicDispatch;
     vk::Instance instance;
     vk::DebugUtilsMessengerEXT debugMessenger;
     vk::PhysicalDevice physicalDevice = VK_NULL_HANDLE;
@@ -129,14 +139,10 @@ protected:
 
     vk::SwapchainKHR swapchain;
     std::vector<vk::Image> swapchainImages;
+    std::vector<std::shared_ptr<Texture>> swapchainTextures;
     vk::Format swapchainImageFormat;
     vk::Extent2D swapchainExtent;
-    std::vector<vk::ImageView> swapchainImageViews;
-
-    vk::RenderPass renderPass;
-    vk::PipelineLayout pipelineLayout;
-
-    std::vector<vk::Framebuffer> swapchainFramebuffers;
+    std::unique_ptr<SwapchainRenderPass> swapchainRenderPass;
 
     vk::CommandPool commandPool;
     std::vector<vk::CommandBuffer> commandBuffers;
@@ -147,10 +153,7 @@ protected:
     std::vector<vk::Fence> imagesInFlight;
     size_t currentFrame = 0;
 
-    GLFWwindow* window;
-    std::vector<std::shared_ptr<Mesh>> staticMeshes;
-
-//    std::shared_ptr<ShaderProgram> defaultShaderProgram;
+    std::shared_ptr<Screen> currentScreen;
 
     std::vector<vk::Buffer> uniformBuffers;
     std::vector<vk::DeviceMemory> uniformBuffersMemory;
@@ -162,6 +165,8 @@ protected:
     bool hasDeviceProps = false;
     vk::PhysicalDeviceFeatures deviceFeatures;
     bool hasDeviceFeatures = false;
+
+    std::chrono::time_point<std::chrono::steady_clock> previousTime;
 
 };
 

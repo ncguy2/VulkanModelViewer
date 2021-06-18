@@ -1,13 +1,11 @@
 #include <iostream>
 #include <fstream>
 #include <cstring>
+#include <thread>
+#include <example/ExampleScreen.h>
 
-#include <display/SimpleScreen.h>
 
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
 #include <core/VulkanCore.hpp>
-#include <glad/glad.h>
 #include <string>
 
 #ifdef WIN32
@@ -38,6 +36,11 @@ std::vector<char> ReadFile(const std::string& filename) {
     return buffer;
 }
 
+int shaderIdx = 0;
+bool finish = false;
+
+Delegate<VulkanCore*, int, int, int, int>::Signature handle;
+
 int main(int _, char** argv) {
     EXE_PATH = std::string(argv[0]);
     CWD = cwd();
@@ -47,53 +50,13 @@ int main(int _, char** argv) {
     VulkanCore core;
     core.InitVulkan();
 
-    std::vector<char> vertShaderCode = ReadFile("assets/shaders/sample/sample.vert");
-    std::vector<char> fragShaderCode = ReadFile("assets/shaders/sample/sample.frag");
-
-    std::shared_ptr<ShaderProgram> shader = core.CreateShaderProgram();
-    shader->AddStage(ShaderStage("main", vk::ShaderStageFlagBits::eVertex, vertShaderCode));
-    shader->AddStage(ShaderStage("main", vk::ShaderStageFlagBits::eFragment, fragShaderCode));
-    shader->AddSamplers(2);
-
-    std::shared_ptr<Mesh> mesh = std::make_shared<Mesh>();
-
-    mesh->SetVertices({
-            Vertex({  -0.5f, -0.5f,   0.0f }, { 1.0f, 0.0f, 0.0f }, {1.0f, 0.0f}),
-            Vertex({   0.5f, -0.5f,   0.0f }, { 0.0f, 1.0f, 0.0f }, {0.0f, 0.0f}),
-            Vertex({   0.5f,  0.5f,   0.0f }, { 0.0f, 0.0f, 1.0f }, {0.0f, 1.0f}),
-            Vertex({  -0.5f,  0.5f,   0.0f }, { 1.0f, 1.0f, 1.0f }, {1.0f, 1.0f}),
-
-            Vertex({  -0.5f, -0.5f,  -0.5f }, { 1.0f, 0.0f, 0.0f }, {1.0f, 0.0f}),
-            Vertex({   0.5f, -0.5f,  -0.5f }, { 0.0f, 1.0f, 0.0f }, {0.0f, 0.0f}),
-            Vertex({   0.5f,  0.5f,  -0.5f }, { 0.0f, 0.0f, 1.0f }, {0.0f, 1.0f}),
-            Vertex({  -0.5f,  0.5f,  -0.5f }, { 1.0f, 1.0f, 1.0f }, {1.0f, 1.0f}),
-    });
-    mesh->SetIndices({
-            Triangle(0, 1, 2),
-            Triangle(2, 3, 0),
-
-            Triangle(4, 5, 6),
-            Triangle(6, 7, 4),
-    });
-
-    mesh->SetShaderProgram(shader);
-    std::shared_ptr<Texture> texture = core.CreateTexture(vk::Format::eR8G8B8A8Srgb, vk::ImageAspectFlagBits::eColor);
-    texture->LoadFromFile(R"(F:\Linked\Downloads\texture.jpg)");
-    shader->SetTexture(texture->GetView(), 0);
-    std::shared_ptr<Texture> face = core.CreateTexture(vk::Format::eR8G8B8A8Srgb, vk::ImageAspectFlagBits::eColor);
-    face->LoadFromFile(R"(F:\Linked\Downloads\awesomeface.png)");
-    shader->SetTexture(face->GetView(), 1);
-    core.CompileShader(shader);
-
-    core.AddMesh(mesh);
+    std::shared_ptr<ExampleScreen> screen = std::make_shared<ExampleScreen>();
+    core.SetScreen(screen);
 
     core.MainLoop();
 
-//    SimpleScreen s;
-//    s.Loop();
+    finish = true;
 
-    texture.reset();
-    shader->Cleanup();
     core.Cleanup();
     return 0;
 }

@@ -5,7 +5,7 @@
 #include <data/Mesh.h>
 #include <core/VulkanCore.hpp>
 
-Mesh::Mesh() : indexType(vk::IndexType::eUint32), shaderProgram(nullptr), useDefaultShader(true) {}
+Mesh::Mesh() : indexType(vk::IndexType::eUint32), shaderProgram(nullptr), useDefaultShader(true), transform(1.0f) {}
 
 void Mesh::SetVertices(std::vector<Vertex> vertices) {
     this->vertices = vertices;

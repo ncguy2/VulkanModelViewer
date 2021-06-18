@@ -6,6 +6,7 @@
 #define GLMODELVIEWER_MESH_H
 
 #include "Shader.h"
+#include "ecs/Transform.h"
 #include <glm/glm.hpp>
 #include <vector>
 #include <vulkan/vulkan.hpp>
@@ -79,6 +80,11 @@ public:
     std::shared_ptr<ShaderProgram> GetShaderProgram();
     void SetShaderProgram(std::shared_ptr<ShaderProgram> shader);
 
+    glm::mat4 transform;
+    glm::vec4 data;
+
+    bool areBuffersValid = false;
+
 protected:
     std::shared_ptr<ShaderProgram> shaderProgram;
     bool useDefaultShader;
@@ -91,6 +97,7 @@ protected:
     std::vector<Vertex> vertices;
     std::vector<Triangle> indices;
     vk::IndexType indexType;
+
 };
 
 #endif//GLMODELVIEWER_MESH_H

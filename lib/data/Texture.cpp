@@ -21,6 +21,13 @@ void Texture::LoadFromFile(const char *file, bool hasAlpha) {
     stbi_image_free(pixels);
 }
 
+void Texture::Set(vk::Image& image) {
+    textureImage = image;
+    manageMemory = false;
+
+    CreateView();
+}
+
 void Texture::Create(int size, void *pixels) {
     imageSize = size;
     vk::Buffer stagingBuffer;
@@ -77,6 +84,9 @@ void Texture::CreateView() {
 
 Texture::~Texture() {
     device->destroyImageView(textureView);
+    if(!manageMemory)
+        return;
+
     device->destroyImage(textureImage);
     device->freeMemory(textureImageMemory);
 }

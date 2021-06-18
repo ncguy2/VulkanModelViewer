@@ -25,6 +25,7 @@
 #include <GLFW/glfw3native.h>
 #include <data/Mesh.h>
 #include <data/vk/CommandBuffer.h>
+#include <core/Screen.h>
 
 #define TEST(x) x != vk::Result::eSuccess
 #define TEST_EXC(x, msg) if(x != vk::Result::eSuccess) throw std::runtime_error(msg);
@@ -55,17 +56,17 @@ static void framebufferResizeCallback(GLFWwindow* window, int width, int height)
     core->framebufferResized = true;
 }
 
-static VkResult CreateDebugUtilsMessengerEXT(vk::Instance instance, const vk::DebugUtilsMessengerCreateInfoEXT* pCreateInfo, const vk::AllocationCallbacks* pAllocator, vk::DebugUtilsMessengerEXT* pDebugMessenger) {
-    auto func = (PFN_vkCreateDebugUtilsMessengerEXT) vkGetInstanceProcAddr((VkInstance) instance, "vkCreateDebugUtilsMessengerEXT");
-    if (func != nullptr)
-        return func((VkInstance) instance, (VkDebugUtilsMessengerCreateInfoEXT*) pCreateInfo, (VkAllocationCallbacks*) pAllocator, (VkDebugUtilsMessengerEXT*) pDebugMessenger);
-    return VK_ERROR_EXTENSION_NOT_PRESENT;
+static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    auto core = reinterpret_cast<VulkanCore*>(glfwGetWindowUserPointer(window));
+    core->OnKey(key, scancode, action, mods);
+}
+
+static vk::Result CreateDebugUtilsMessengerEXT(vk::Instance instance, const vk::DebugUtilsMessengerCreateInfoEXT* pCreateInfo, const vk::AllocationCallbacks* pAllocator, vk::DebugUtilsMessengerEXT* pDebugMessenger) {
+    return instance.createDebugUtilsMessengerEXT(pCreateInfo, pAllocator, pDebugMessenger, vk::DispatchLoaderDynamic());
 }
 
 static void DestroyDebugUtilsMessengerEXT(vk::Instance instance, vk::DebugUtilsMessengerEXT debugMessenger, const vk::AllocationCallbacks* pAllocator) {
-    auto func = (PFN_vkDestroyDebugUtilsMessengerEXT) vkGetInstanceProcAddr((VkInstance) instance, "vkDestroyDebugUtilsMessengerEXT");
-    if (func != nullptr)
-        func((VkInstance) instance, (VkDebugUtilsMessengerEXT) debugMessenger, (VkAllocationCallbacks*) pAllocator);
+    instance.destroyDebugUtilsMessengerEXT(debugMessenger, pAllocator, vk::DispatchLoaderDynamic());
 }
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
@@ -182,9 +183,7 @@ void VulkanCore::SetupDebugMessenger() {
     vk::DebugUtilsMessengerCreateInfoEXT createInfo{};
     PopulateDebugMessengerCreateInfo(createInfo);
 
-    if (CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
-        throw std::runtime_error("failed to set up debug messenger!");
-    }
+    CHECK(CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr, &debugMessenger));
 }
 
 GLFWwindow* VulkanCore::InitVulkan() {
@@ -201,6 +200,7 @@ GLFWwindow* VulkanCore::InitVulkan() {
     glfwMakeContextCurrent(window);
     glfwSetWindowUserPointer(window, this);
     glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
+    glfwSetKeyCallback(window, keyCallback);
 
     uint32_t extensionCount = 0;
     CHECK(vk::enumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr));
@@ -219,27 +219,19 @@ GLFWwindow* VulkanCore::InitVulkan() {
     PickPhysicalDevice();
     CreateLogicalDevice();
     CreateSwapChain();
-    CreateImageViews();
+    CreateDepthResources();
     CreateRenderPass();
     CreateDescriptorPool();
     CreateUniformBuffers();
     CreateGraphicsPipeline();
     CreateCommandPool();
-    CreateDepthResources();
-    CreateFramebuffers();
     CreateCommandBuffers();
     CreateSyncObjects();
-
-    staticMeshAdded += (staticMeshAddedHandle = [](VulkanCore* core, std::shared_ptr<Mesh> meshPtr) {
-      core->RecreateStaticCommandBuffer();
-    });
 
     return window;
 }
 
 void VulkanCore::Cleanup() {
-
-    staticMeshAdded -= staticMeshAddedHandle;
 
     if(enableValidationLayers)
         DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
@@ -254,14 +246,12 @@ void VulkanCore::Cleanup() {
 
     CleanupSwapchain();
 
-    for(const auto& mesh : staticMeshes)
-        mesh->Dispose();
     device.destroyCommandPool(commandPool);
 
-    device.destroy();
     if (enableValidationLayers) {
         DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
     }
+    device.destroy();
     instance.destroySurfaceKHR(surface);
     instance.destroy();
     glfwDestroyWindow(window);
@@ -471,32 +461,14 @@ void VulkanCore::CreateSwapChain() {
     swapchainImages = device.getSwapchainImagesKHR(swapchain);
     swapchainImageFormat = surfaceFormat.format;
     swapchainExtent = extent;
-}
 
-void VulkanCore::CreateImageViews() {
-    swapchainImageViews.resize(swapchainImages.size());
-    for(size_t i = 0; i < swapchainImages.size(); i++) {
-
-        swapchainImageViews[i] =  CreateImageView(swapchainImages[i], swapchainImageFormat, vk::ImageAspectFlagBits::eColor);
-
-//        vk::ImageViewCreateInfo createInfo{};
-//        createInfo.setImage(swapchainImages[i]);
-//        createInfo.setViewType(vk::ImageViewType::e2D);
-//        createInfo.setFormat(swapchainImageFormat);
-//        createInfo.components.setR(vk::ComponentSwizzle::eIdentity);
-//        createInfo.components.setG(vk::ComponentSwizzle::eIdentity);
-//        createInfo.components.setB(vk::ComponentSwizzle::eIdentity);
-//        createInfo.components.setA(vk::ComponentSwizzle::eIdentity);
-//        createInfo.subresourceRange.setAspectMask(vk::ImageAspectFlagBits::eColor);
-//        createInfo.subresourceRange.setBaseMipLevel(0);
-//        createInfo.subresourceRange.setLevelCount(1);
-//        createInfo.subresourceRange.setBaseArrayLayer(0);
-//        createInfo.subresourceRange.setLayerCount(1);
-//
-//        if(device.createImageView(&createInfo, nullptr, &swapchainImageViews[i]) != vk::Result::eSuccess)
-//            throw std::runtime_error("Failed to create image views");
+    swapchainTextures.resize(swapchainImages.size());
+    for(int i = 0; i < swapchainImages.size(); i++) {
+        swapchainTextures[i] = std::make_shared<Texture>(this, device, swapchainImageFormat, vk::ImageAspectFlagBits::eColor);
+        swapchainTextures[i]->Set(swapchainImages[i]);
     }
 }
+
 
 void VulkanCore::CreateGraphicsPipeline() {
     std::vector<char> vertShaderCode = ReadFile("assets/shaders/sample/sample.vert");
@@ -523,86 +495,14 @@ vk::ShaderModule VulkanCore::CreateShaderModule(std::vector<char> source) {
     return shaderModule;
 }
 
-void VulkanCore::CreateRenderPass(){
-    vk::AttachmentDescription colourAttachment{};
-    colourAttachment.setFormat(swapchainImageFormat);
-    colourAttachment.setSamples(vk::SampleCountFlagBits::e1);
-    colourAttachment.setLoadOp(vk::AttachmentLoadOp::eClear);
-    colourAttachment.setStoreOp(vk::AttachmentStoreOp::eStore);
-    colourAttachment.setStencilLoadOp(vk::AttachmentLoadOp::eDontCare);
-    colourAttachment.setStencilStoreOp(vk::AttachmentStoreOp::eDontCare);
-    colourAttachment.setInitialLayout(vk::ImageLayout::eUndefined);
-    colourAttachment.setFinalLayout(vk::ImageLayout::ePresentSrcKHR);
+void VulkanCore::CreateRenderPass() {
+    swapchainRenderPass = std::make_unique<SwapchainRenderPass>(&device);
+    swapchainRenderPass->SetFBCount(swapchainTextures.size());
+    swapchainRenderPass->SetFBSize(swapchainExtent);
+    swapchainRenderPass->AddFBAttachments(swapchainTextures, vk::ImageUsageFlagBits::eColorAttachment, swapchainImageFormat);
+    swapchainRenderPass->AddFBAttachment(depthTexturePtr);
 
-    vk::AttachmentReference colourAttachmentRef{};
-    colourAttachmentRef.setAttachment(0);
-    colourAttachmentRef.setLayout(vk::ImageLayout::eColorAttachmentOptimal);
-
-    vk::AttachmentDescription depthAttachment{};
-    depthAttachment.setFormat(FindDepthFormat());
-    depthAttachment.setSamples(vk::SampleCountFlagBits::e1);
-    depthAttachment.setLoadOp(vk::AttachmentLoadOp::eClear);
-    depthAttachment.setStoreOp(vk::AttachmentStoreOp::eDontCare);
-    depthAttachment.setStencilLoadOp(vk::AttachmentLoadOp::eDontCare);
-    depthAttachment.setStencilStoreOp(vk::AttachmentStoreOp::eDontCare);
-    depthAttachment.setInitialLayout(vk::ImageLayout::eUndefined);
-    depthAttachment.setFinalLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
-
-    vk::AttachmentReference depthAttachmentRef{};
-    depthAttachmentRef.setAttachment(1);
-    depthAttachmentRef.setLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
-
-    vk::SubpassDescription subpass{};
-    subpass.setPipelineBindPoint(vk::PipelineBindPoint::eGraphics);
-    subpass.setColorAttachmentCount(1);
-    subpass.setPColorAttachments(&colourAttachmentRef);
-    subpass.setPDepthStencilAttachment(&depthAttachmentRef);
-
-//    std::array<vk::SubpassDependency, 2> dependencies;
-    std::array<vk::SubpassDependency, 1> dependencies;
-    dependencies[0].setSrcSubpass(VK_SUBPASS_EXTERNAL);
-    dependencies[0].setDstSubpass(0);
-    dependencies[0].setSrcStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests);
-    dependencies[0].setDstStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests);
-    dependencies[0].setSrcAccessMask(vk::AccessFlagBits::eNoneKHR);
-    dependencies[0].setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite);
-
-//    dependencies[1].setSrcSubpass(0);
-//    dependencies[1].setDstSubpass(VK_SUBPASS_EXTERNAL);
-//    dependencies[1].setSrcStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
-//    dependencies[1].setDstStageMask(vk::PipelineStageFlagBits::eBottomOfPipe);
-//    dependencies[1].setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite);
-//    dependencies[1].setDstAccessMask(vk::AccessFlagBits::eMemoryRead);
-
-    std::array<vk::AttachmentDescription, 2> attachments = { colourAttachment, depthAttachment };
-    vk::RenderPassCreateInfo renderPassInfo{};
-    renderPassInfo.setAttachments(attachments);
-    renderPassInfo.setSubpassCount(1);
-    renderPassInfo.setPSubpasses(&subpass);
-    renderPassInfo.setDependencies(dependencies);
-
-    if(device.createRenderPass(&renderPassInfo, nullptr, &renderPass) != vk::Result::eSuccess)
-        throw std::runtime_error("Failed to create render pass");
-
-}
-
-void VulkanCore::CreateFramebuffers(){
-    swapchainFramebuffers.resize(swapchainImageViews.size());
-    for(size_t i = 0; i < swapchainImageViews.size(); i++) {
-        std::array<vk::ImageView, 2> attachments = {
-                swapchainImageViews[i],
-                depthTexturePtr->GetView()
-        };
-
-        vk::FramebufferCreateInfo framebufferInfo{};
-        framebufferInfo.setRenderPass(renderPass);
-        framebufferInfo.setAttachments(attachments);
-        framebufferInfo.setWidth(swapchainExtent.width).setHeight(swapchainExtent.height);
-        framebufferInfo.setLayers(1);
-
-        if(device.createFramebuffer(&framebufferInfo, nullptr, &swapchainFramebuffers[i]) != vk::Result::eSuccess)
-            throw std::runtime_error("Failed to create framebuffer");
-    }
+    swapchainRenderPass->Build();
 }
 
 void VulkanCore::CreateCommandPool(){
@@ -610,13 +510,14 @@ void VulkanCore::CreateCommandPool(){
 
     vk::CommandPoolCreateInfo poolInfo{};
     poolInfo.setQueueFamilyIndex(queueFamilyIndices.graphicsFamily.value());
+    poolInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
 
     if(device.createCommandPool(&poolInfo, nullptr, &commandPool) != vk::Result::eSuccess)
         throw std::runtime_error("Failed to create command pool");
 }
 
 void VulkanCore::CreateCommandBuffers() {
-    commandBuffers.resize(swapchainFramebuffers.size());
+    commandBuffers.resize(swapchainRenderPass->Count());
 
     vk::CommandBufferAllocateInfo allocInfo{};
     allocInfo.setCommandPool(commandPool);
@@ -626,55 +527,6 @@ void VulkanCore::CreateCommandBuffers() {
     if(device.allocateCommandBuffers(&allocInfo, commandBuffers.data()) != vk::Result::eSuccess)
         throw std::runtime_error("Failed to allocate command buffers");
 
-    for(size_t i = 0; i < commandBuffers.size(); i++) {
-        vk::CommandBufferBeginInfo beginInfo{};
-
-        if(TEST(commandBuffers[i].begin(&beginInfo)))
-            throw std::runtime_error("Failed to begin recording command buffer");
-
-        vk::RenderPassBeginInfo renderPassInfo{};
-        renderPassInfo.setRenderPass(renderPass);
-        renderPassInfo.setFramebuffer(swapchainFramebuffers[i]);
-        renderPassInfo.renderArea.setOffset({0, 0});
-        renderPassInfo.renderArea.setExtent(swapchainExtent);
-        std::array<vk::ClearValue, 2> clearValues{};
-        clearValues[0].color.setFloat32({0, 0, 0, 1});
-        clearValues[1].depthStencil.setDepth(1.0f).setStencil(0);
-        renderPassInfo.setClearValues(clearValues);
-
-        commandBuffers[i].beginRenderPass(&renderPassInfo, vk::SubpassContents::eInline);
-
-        std::map<std::shared_ptr<ShaderProgram>, std::vector<std::shared_ptr<Mesh>>> meshMap;
-        for (const std::shared_ptr<Mesh>& item : staticMeshes) {
-            std::shared_ptr<ShaderProgram> key = item->GetShaderProgram();
-            meshMap[key].push_back(item);
-        }
-
-        for(const auto& pair : meshMap) {
-            std::shared_ptr<ShaderProgram> shader;
-//            if(pair.first == nullptr)
-//                shader = defaultShaderProgram;
-//            else
-                shader = pair.first;
-
-            commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eGraphics, *shader->GetPipeline());
-            shader->BindDescriptorSet(commandBuffers[i], vk::PipelineBindPoint::eGraphics, i);
-
-            for(const auto& mesh : pair.second) {
-                mesh->CreateVertexBuffer(*this, device);
-                mesh->CreateIndexBuffer(*this, device);
-                vk::Buffer vertexBuffers[] = {mesh->GetVertexBuffer()};
-                vk::DeviceSize offsets[] = {0};
-                commandBuffers[i].bindVertexBuffers(0, 1, vertexBuffers, offsets);
-                commandBuffers[i].bindIndexBuffer(mesh->GetIndexBuffer(), 0, mesh->GetIndexType());
-                commandBuffers[i].drawIndexed(mesh->GetIndexCount(), 1, 0, 0, 0);
-            }
-        }
-
-        commandBuffers[i].endRenderPass();
-
-        commandBuffers[i].end();
-    }
 }
 
 void VulkanCore::CreateSyncObjects() {
@@ -697,6 +549,9 @@ void VulkanCore::CreateSyncObjects() {
 }
 
 void VulkanCore::MainLoop() {
+
+    previousTime = std::chrono::high_resolution_clock::now();
+
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
         DrawFrame();
@@ -705,9 +560,48 @@ void VulkanCore::MainLoop() {
     device.waitIdle();
 }
 
+void VulkanCore::RecordCommandBuffers(int i) {
+    commandBuffers[i].reset(vk::CommandBufferResetFlagBits::eReleaseResources);
+
+    vk::CommandBufferBeginInfo beginInfo{};
+    beginInfo.flags = vk::CommandBufferUsageFlagBits::eSimultaneousUse;
+
+    if(TEST(commandBuffers[i].begin(&beginInfo)))
+        throw std::runtime_error("Failed to begin recording command buffer");
+
+    vk::RenderPassBeginInfo renderPassInfo{};
+    renderPassInfo.setRenderPass(swapchainRenderPass->GetVK());
+    renderPassInfo.setFramebuffer(swapchainRenderPass->Get(i).GetVK());
+    renderPassInfo.renderArea.setOffset({0, 0});
+    renderPassInfo.renderArea.setExtent(swapchainExtent);
+    std::array<vk::ClearValue, 2> clearValues{};
+    clearValues[0].color.setFloat32({0, 0, 0, 1});
+    clearValues[1].depthStencil.setDepth(1.0f).setStencil(0);
+    renderPassInfo.setClearValues(clearValues);
+
+    commandBuffers[i].beginRenderPass(&renderPassInfo, vk::SubpassContents::eInline);
+
+    if(currentScreen)
+        currentScreen->Record(i, commandBuffers[i]);
+
+    commandBuffers[i].endRenderPass();
+    commandBuffers[i].end();
+}
+
 void VulkanCore::DrawFrame() {
 
+
+    std::chrono::time_point<std::chrono::steady_clock> currentTime;
+    currentTime = std::chrono::high_resolution_clock::now();
+    float deltaTime = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - previousTime).count();
+    previousTime = currentTime;
+
+    if(currentScreen)
+        currentScreen->Update(deltaTime);
+
     CHECK(device.waitForFences(1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX));
+
+    RecordCommandBuffers(currentFrame);
 
     uint32_t imageIndex;
     vk::Result result = device.acquireNextImageKHR(swapchain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
@@ -765,13 +659,20 @@ void VulkanCore::DrawFrame() {
     currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
-void VulkanCore::UpdateUniformBuffer(uint32_t currentImage) {
-    static auto startTime = std::chrono::high_resolution_clock::now();
-    auto currentTime = std::chrono::high_resolution_clock::now();
-    float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+void VulkanCore::SetViewProj(uint32_t currentImage, glm::mat4& view, glm::mat4& proj) {
+    UniformBufferObject ubo{};
+    ubo.view = view;
+    ubo.proj = proj;
 
-    UniformBufferObject ubo;
-    ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    void* data;
+    CHECK(device.mapMemory(uniformBuffersMemory[currentImage], 0, sizeof(ubo), (vk::MemoryMapFlags) 0, &data));
+    memcpy(data, &ubo, sizeof(ubo));
+    device.unmapMemory(uniformBuffersMemory[currentImage]);
+}
+
+void VulkanCore::UpdateUniformBuffer(uint32_t currentImage) {
+    UniformBufferObject ubo{};
+//    ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     ubo.proj = glm::perspective(glm::radians(45.0f), swapchainExtent.width / (float) swapchainExtent.height, 0.1f, 10.f);
     ubo.proj[1][1] *= -1;
@@ -782,15 +683,10 @@ void VulkanCore::UpdateUniformBuffer(uint32_t currentImage) {
     device.unmapMemory(uniformBuffersMemory[currentImage]);
 }
 void VulkanCore::CleanupSwapchain() {
-    for(auto framebuffer : swapchainFramebuffers)
-        device.destroyFramebuffer(framebuffer);
+    swapchainRenderPass->Dispose();
 
     device.freeCommandBuffers(commandPool, commandBuffers.size(), commandBuffers.data());
-
-    device.destroyPipelineLayout(pipelineLayout);
-    device.destroyRenderPass(renderPass);
-    for (auto imageView : swapchainImageViews)
-        device.destroyImageView(imageView);
+    swapchainTextures.clear();
     device.destroySwapchainKHR(swapchain);
 
     for(size_t i = 0; i < swapchainImages.size(); i++) {
@@ -814,15 +710,14 @@ void VulkanCore::RecreateSwapchain() {
     CleanupSwapchain();
 
     CreateSwapChain();
-    CreateImageViews();
+    CreateDepthResources();
     CreateRenderPass();
     CreateGraphicsPipeline();
-    CreateDepthResources();
-    CreateFramebuffers();
     CreateUniformBuffers();
     CreateDescriptorPool();
     CreateCommandBuffers();
     swapchainRecreated(this, width, height);
+    currentScreen->Resize(width, height);
 }
 
 uint32_t VulkanCore::FindMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties) {
@@ -833,11 +728,6 @@ uint32_t VulkanCore::FindMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags
             return i;
     }
     throw std::runtime_error("Failed to find suitable memory type");
-}
-
-void VulkanCore::AddMesh(std::shared_ptr<Mesh> mesh) {
-    staticMeshes.push_back(mesh);
-    staticMeshAdded(this, mesh);
 }
 
 void VulkanCore::CreateBuffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties, vk::Buffer &buffer, vk::DeviceMemory &bufferMemory) {
@@ -891,13 +781,13 @@ void VulkanCore::CreateUniformBuffers() {
 void VulkanCore::CreateDescriptorPool() {
     std::array<vk::DescriptorPoolSize, 2> poolSizes{};
     poolSizes[0].setType(vk::DescriptorType::eUniformBuffer);
-    poolSizes[0].setDescriptorCount(swapchainImages.size());
+    poolSizes[0].setDescriptorCount(swapchainImages.size() * 5);
     poolSizes[1].setType(vk::DescriptorType::eCombinedImageSampler);
-    poolSizes[1].setDescriptorCount(swapchainImages.size());
+    poolSizes[1].setDescriptorCount(swapchainImages.size() * 5);
 
     vk::DescriptorPoolCreateInfo poolInfo{};
     poolInfo.setPoolSizes(poolSizes);
-    poolInfo.setMaxSets(swapchainImages.size());
+    poolInfo.setMaxSets(swapchainImages.size()*5);
 
     CHECK(device.createDescriptorPool(&poolInfo, nullptr, &descriptorPool));
 }
@@ -1080,7 +970,7 @@ void VulkanCore::CleanupCommandBuffers() {
     device.freeCommandBuffers(commandPool, commandBuffers.size(), commandBuffers.data());
 }
 
-void VulkanCore::RecreateStaticCommandBuffer() {
+void VulkanCore::RecreateCommandBuffer() {
     CleanupCommandBuffers();
     CreateCommandBuffers();
 }
@@ -1089,9 +979,37 @@ void VulkanCore::CompileShader(const std::shared_ptr<ShaderProgram>& shaderPtr) 
     CompileShader(shaderPtr.get());
 }
 void VulkanCore::CompileShader(ShaderProgram* shaderPtr) {
-    shaderPtr->Compile(swapchainExtent, swapchainImageFormat, descriptorPool);
+    shaderPtr->Compile(swapchainExtent, swapchainImageFormat, descriptorPool, swapchainRenderPass->GetVK());
 }
 
 std::shared_ptr<Texture> VulkanCore::CreateTexture(vk::Format format, vk::ImageAspectFlags aspectFlags) {
     return std::make_shared<Texture>(this, device, format, aspectFlags);
+}
+
+void VulkanCore::OnKey(int key, int scancode, int action, int mods) {
+    onKey(this, key, scancode, action, mods);
+    if(currentScreen)
+        currentScreen->OnKey(key, scancode, action, mods);
+}
+
+void VulkanCore::SetScreen(std::shared_ptr<Screen> newScreenPtr) {
+    if(currentScreen) {
+        currentScreen->Hide();
+    }
+    currentScreen = newScreenPtr;
+    if(!currentScreen)
+        return;
+
+    CoreScreenComponents c = {
+            this,
+            &device
+    };
+    currentScreen->AssignCoreComponents(c);
+
+    if(!currentScreen->IsCreated())
+        currentScreen->Create();
+
+    currentScreen->Show();
+
+    RecreateCommandBuffer();
 }
