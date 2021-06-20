@@ -47,6 +47,10 @@ int main(int _, char** argv) {
     std::cout << "EXE Path: " << EXE_PATH.c_str() << std::endl;
     std::cout << "CWD: " << CWD.c_str() << std::endl;
 
+    auto pid = _getpid();
+    std::cout << "PID: " << pid << std::endl;
+    getchar();
+
     VulkanCore core;
     core.InitVulkan();
 

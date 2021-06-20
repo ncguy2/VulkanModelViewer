@@ -82,7 +82,7 @@ void Texture::CreateView() {
     textureView = core->CreateImageView(textureImage, format, aspectFlags);
 }
 
-Texture::~Texture() {
+void Texture::Dispose() {
     device->destroyImageView(textureView);
     if(!manageMemory)
         return;
@@ -92,6 +92,9 @@ Texture::~Texture() {
 }
 vk::ImageView Texture::GetView() {
     return textureView;
+}
+vk::ImageView* Texture::GetViewPtr() {
+    return &textureView;
 }
 
 vk::Image& Texture::GetImage() {

@@ -10,12 +10,12 @@
 #include <vulkan/vulkan.hpp>
 
 struct FramebufferAttachment {
-    std::shared_ptr<Texture> texture{};
+    vk::ImageView* texture;
     vk::ImageUsageFlags usageFlags;
     vk::Format format;
 
 
-    bool Is(vk::ImageUsageFlags flag);
+    bool Is(vk::ImageUsageFlags flag) const;
     vk::ImageLayout GetReferenceLayout();
     vk::ImageLayout GetFinalLayout();
 };
@@ -27,7 +27,7 @@ public:
 
     void SetDevice(vk::Device* device);
 
-    void AddAttachment(std::shared_ptr<Texture> texture, vk::ImageUsageFlags usage, vk::Format format);
+    void AddAttachment(vk::ImageView* texture, vk::ImageUsageFlags usage, vk::Format format);
     void SetSize(vk::Extent2D size);
     void Build(RenderPass* renderPass);
 

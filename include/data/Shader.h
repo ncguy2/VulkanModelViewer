@@ -82,6 +82,9 @@ protected:
     std::array<vk::ImageView, MAX_TEXTURE_SAMPLERS> textures;
     bool isCompiled;
 
+    void UpdateDescriptorSets();
+    int imageCount;
+    std::vector<vk::Buffer> uniformBuffers;
 };
 
 #endif//GLMODELVIEWER_SHADER_H

@@ -6,7 +6,7 @@
 #define GLMODELVIEWER_SCENE_H
 
 #include <vulkan/vulkan.hpp>
-
+#include <data/Contexts.h>
 #include <memory>
 #include <vector>
 
@@ -17,8 +17,7 @@ class EntityScene {
 public:
 
     std::shared_ptr<Entity> CreateEntity();
-    void Update(float delta);
-    void Record(uint32_t idx, vk::CommandBuffer& buffer, VulkanCore* core);
+    void Update(float delta, UpdateContext &context);
 
 protected:
     std::vector<std::shared_ptr<Entity>> entities;

@@ -7,29 +7,41 @@
 
 #include <ecs/Transform.h>
 #include <vulkan/vulkan.hpp>
+#include <data/Contexts.h>
+#include <ecs/Component.h>
 
 #define FOR_EACH_COMPONENT(task) ForEachComponent([&](const std::shared_ptr<Component>& component){task;});
 
-class Component;
 class VulkanCore;
 
 class Entity {
 public:
     Entity();
 
-    void Update(float delta);
-    void Record(int bufferIdx, vk::CommandBuffer& buffer, VulkanCore* core);
+    void Update(float delta, UpdateContext& context);
 
-    template<typename T>
+    template<typename T, typename =
+    std::enable_if_t<std::is_base_of_v<Component, std::remove_reference_t<T>>>>
     std::shared_ptr<T> AddComponent(std::initializer_list<T> initList) {
         std::shared_ptr<T> ptr = std::make_shared<T>(initList);
+        ptr->Attach(this);
         components[typeid(T).hash_code()] = ptr;
         return ptr;
     }
 
-    template<typename T>
-    std::shared_ptr<T> GetComponent() {
-        return components[typeid(T).hash_code()];
+    template<typename T, typename =
+    std::enable_if_t<std::is_base_of_v<Component, std::remove_reference_t<T>>>>
+    std::shared_ptr<T> AddComponent() {
+        std::shared_ptr<T> ptr = std::make_shared<T>();
+        ptr->Attach(this);
+        components[typeid(T).hash_code()] = ptr;
+        return ptr;
+    }
+
+    template<typename T, typename =
+    std::enable_if_t<std::is_base_of_v<Component, std::remove_reference_t<T>>>>
+    T* GetComponent() {
+        return (T*) components[typeid(T).hash_code()].get();
     }
 
     void ForEachComponent(const std::function<void(std::shared_ptr<Component>)>& func);

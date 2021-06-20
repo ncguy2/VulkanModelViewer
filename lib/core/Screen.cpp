@@ -17,13 +17,15 @@ bool Screen::IsCreated() const {
 void Screen::AssignCoreComponents(CoreScreenComponents &c) {
     this->components = c;
 }
+EntityScene* Screen::GetScenePtr() {
+    return &scene;
+}
 
 void ScreenAdapter::Create() {
     Screen::Create();
 }
 
 void ScreenAdapter::Update(float delta) {}
-void ScreenAdapter::Record(int bufferIdx, vk::CommandBuffer &buffer) {}
 void ScreenAdapter::Resize(int width, int height) {}
 void ScreenAdapter::Show() {}
 void ScreenAdapter::Hide() {}

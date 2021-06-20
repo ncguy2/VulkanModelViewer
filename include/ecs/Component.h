@@ -5,13 +5,14 @@
 #ifndef GLMODELVIEWER_COMPONENT_H
 #define GLMODELVIEWER_COMPONENT_H
 
+#include <data/Contexts.h>
+
 class Entity;
 class VulkanCore;
 
 class Component {
 public:
-    virtual void Update(float delta) = 0;
-    virtual void Record(int bufferIdx, vk::CommandBuffer& buffer, VulkanCore* core) = 0;
+    virtual void Update(float delta, UpdateContext& context) = 0;
 
     void Attach(Entity* entity) { attachedEntity = entity; }
     void Detach() { Attach(nullptr); }

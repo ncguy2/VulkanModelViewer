@@ -37,7 +37,8 @@ ShaderProgram::ShaderProgram(VulkanCore *core, vk::Device &device) : core(core),
     };
     textureBound += textureBoundHandle = [](ShaderProgram *program, vk::ImageView view, int slot) {
         if (program->isCompiled)
-            program->core->CompileShader(program);
+            program->UpdateDescriptorSets();
+//            program->core->CompileShader(program);
     };
     stageAdded += stageAddedHandle = [](ShaderProgram *program, ShaderStage stage) {
         if (program->isCompiled)
@@ -89,6 +90,12 @@ void ShaderProgram::BuildDescriptorSets(vk::DescriptorPool &descriptorPool, int 
     descriptorSets.resize(imageCount);
     CHECK(device->allocateDescriptorSets(&allocInfo, descriptorSets.data()));
 
+    this->imageCount = imageCount;
+    this->uniformBuffers = uniformBuffers;
+    UpdateDescriptorSets();
+}
+
+void ShaderProgram::UpdateDescriptorSets() {
     for (size_t i = 0; i < imageCount; i++) {
         vk::DescriptorBufferInfo bufferInfo{};
         bufferInfo.setBuffer(uniformBuffers[i]);

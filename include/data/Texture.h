@@ -12,15 +12,17 @@ class VulkanCore;
 class Texture {
 public:
     Texture(VulkanCore* core, vk::Device& device, vk::Format format, vk::ImageAspectFlags aspectFlags);
-    ~Texture();
 
     void LoadFromFile(const char* file, bool hasAlpha = true);
     void Create(int size, void* data = nullptr);
     void Set(vk::Image& image);
+    void Dispose();
 
     void SetSize(int width, int height);
 
     vk::ImageView GetView();
+    vk::ImageView *GetViewPtr();
+
     vk::Image& GetImage();
 
     vk::ImageUsageFlags usageFlags;

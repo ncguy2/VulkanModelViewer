@@ -3,14 +3,16 @@
 //
 
 #include <data/RenderPass.h>
+#include <core/VulkanCore.hpp>
 
 RenderPass::RenderPass(vk::Device *device) : VulkanDeviceObject(device) {}
 
 void RenderPass::Build() {
-    std::vector<FramebufferAttachment> attachments = framebuffer.GetAttachments();
+    std::vector<FramebufferAttachment> attachments = framebuffers[0].GetAttachments();
 
-    std::vector<vk::AttachmentDescription> attachmentDescriptions(framebuffer.Count(), vk::AttachmentDescription{});
-    std::vector<vk::AttachmentReference> attachmentReferences(framebuffer.Count() - 1, vk::AttachmentReference{});
+
+    std::vector<vk::AttachmentDescription> attachmentDescriptions(framebuffers[0].Count(), vk::AttachmentDescription{});
+    std::vector<vk::AttachmentReference> attachmentReferences(framebuffers[0].Count() - 1, vk::AttachmentReference{});
     vk::AttachmentReference depthAttachmentReference;
 
     int j = 0;
@@ -73,53 +75,54 @@ vk::RenderPass& RenderPass::GetVK() {
     return vkRenderPass;
 }
 void RenderPass::BuildFramebuffer() {
-    framebuffer.Build(this);
-}
-
-void RenderPass::AddFBAttachment(std::shared_ptr<Texture> texture) {
-    framebuffer.AddAttachment(texture, texture->usageFlags, texture->format);
-}
-
-void RenderPass::SetFBSize(vk::Extent2D size) {
-    framebuffer.SetSize(size);
-}
-void RenderPass::Dispose() {
-    framebuffer.Dispose();
-}
-
-SwapchainRenderPass::SwapchainRenderPass(vk::Device *device) : RenderPass(device) {}
-void SwapchainRenderPass::BuildFramebuffer() {
-    RenderPass::BuildFramebuffer();
-    for (auto &item : additionalFramebuffers)
+    for (auto &item : framebuffers)
         item.Build(this);
 }
 
-void SwapchainRenderPass::AddFBAttachment(std::shared_ptr<Texture> texture) {
-    RenderPass::AddFBAttachment(texture);
-    for (auto &item : additionalFramebuffers)
-        item.AddAttachment(texture, texture->usageFlags, texture->format);
+void RenderPass::AddFBAttachment(unsigned int fboIdx, vk::ImageView* texture, vk::ImageUsageFlags usage, vk::Format format) {
+    framebuffers[fboIdx].AddAttachment(texture, usage, format);
 }
-void SwapchainRenderPass::SetFBSize(vk::Extent2D size) {
-    RenderPass::SetFBSize(size);
-    for (auto &item : additionalFramebuffers)
+
+void RenderPass::AddFBAttachment(unsigned int fboIdx, std::shared_ptr<Texture> texture) {
+    AddFBAttachment(fboIdx, texture->GetViewPtr(), texture->usageFlags, texture->format);
+}
+
+void RenderPass::SetFBSize(vk::Extent2D size) {
+    for (auto &item : framebuffers)
         item.SetSize(size);
 }
-int SwapchainRenderPass::Count() {
-    return additionalFramebuffers.size() + 1;
-}
-
-void SwapchainRenderPass::SetFBCount(int amount) {
-    additionalFramebuffers.resize(amount - 1);
-}
-
-void SwapchainRenderPass::AddFBAttachments(std::vector<std::shared_ptr<Texture>> textures, vk::ImageUsageFlags usage, vk::Format format) {
-    framebuffer.AddAttachment(textures[0], usage, format);
-    for(int i = 0; i < additionalFramebuffers.size(); i++) {
-        additionalFramebuffers[i].AddAttachment(textures[i + 1], usage, format);
-    }
-}
-void SwapchainRenderPass::Dispose() {
-    RenderPass::Dispose();
-    for (auto &item : additionalFramebuffers)
+void RenderPass::Dispose() {
+    for (auto &item : framebuffers)
         item.Dispose();
+}
+
+unsigned int RenderPass::Count() {
+    return framebuffers.size();
+}
+void RenderPass::Resize(unsigned int amt) {
+    framebuffers.resize(amt);
+}
+
+std::shared_ptr<RenderPass> RenderPass::CreateStandardColourDepthPass(VulkanCore* core, vk::Extent2D size, std::vector<std::shared_ptr<Texture>>& textureList, std::vector<std::shared_ptr<Texture>>& depthTextureList, int bufferCount) {
+    std::shared_ptr<RenderPass> pass = std::make_shared<RenderPass>(core->GetDevicePtr());
+    pass->Resize(bufferCount);
+
+    int texSize = size.width * size.height * 4;
+
+    for(int i = 0; i < bufferCount; i++) {
+        std::shared_ptr<Texture> texture = core->CreateTexture(core->swapchainImageFormat, vk::ImageAspectFlagBits::eColor);
+        texture->usageFlags |= vk::ImageUsageFlagBits::eColorAttachment;
+        texture->SetSize(size.width, size.height);
+        texture->Create(texSize);
+        std::shared_ptr<Texture> depthTexture = core->CreateDepthTexture(size);
+        textureList[i] = texture;
+        depthTextureList[i] = depthTexture;
+        pass->AddFBAttachment(i, texture);
+        pass->AddFBAttachment(i, depthTexture);
+    }
+
+    pass->SetFBSize(size);
+
+    pass->Build();
+    return pass;
 }

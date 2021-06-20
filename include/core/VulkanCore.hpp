@@ -12,6 +12,7 @@
 #include <optional>
 #include <vulkan/vulkan.hpp>
 #include <chrono>
+#include <data/Contexts.h>
 
 struct QueueFamilyIndices {
     std::optional<uint32_t> graphicsFamily;
@@ -30,19 +31,27 @@ struct SwapChainSupportDetails {
 
 class GLFWwindow;
 class Mesh;
+class Camera;
 class Screen;
+class MeshRenderer;
 
 class VulkanCore {
 public:
 
     typedef Delegate<VulkanCore*, uint32_t, uint32_t> SwapchainRecreated;
     typedef Delegate<VulkanCore*, std::shared_ptr<Mesh>> StaticMeshAdded;
+    typedef Delegate<RendererContext&> Render;
 
     // Event Delegates
     SwapchainRecreated swapchainRecreated;
     StaticMeshAdded staticMeshAdded;
+    Render render;
 
     StaticMeshAdded::Signature staticMeshAddedHandle;
+
+    std::shared_ptr<Camera> primaryCamera;
+
+    vk::Device* GetDevicePtr();
 
 public:
     GLFWwindow* InitVulkan();
@@ -76,14 +85,15 @@ public:
     void CompileShader(const std::shared_ptr<ShaderProgram>& shaderPtr);
     void CompileShader(ShaderProgram* shaderPtr);
     std::shared_ptr<Texture> CreateTexture(vk::Format format, vk::ImageAspectFlags aspectFlags);
+    std::shared_ptr<Texture> CreateDepthTexture(vk::Extent2D size);
 
     void OnKey(int key, int scancode, int action, int mods);
     Delegate<VulkanCore*, int, int, int, int> onKey;
-    void RecreateCommandBuffer();
     GLFWwindow* window;
 
     void SetScreen(std::shared_ptr<Screen> newScreenPtr);
     void SetViewProj(uint32_t currentImage, glm::mat4& view, glm::mat4& proj);
+    vk::Format swapchainImageFormat;
 
 protected:
     void CreateInstance();
@@ -104,15 +114,12 @@ protected:
     void CreateSwapChain();
     void CreateGraphicsPipeline();
     void CreateCommandPool();
-    void CreateCommandBuffers();
     void CreateSyncObjects();
     void CleanupSwapchain();
     void RecreateSwapchain();
     void CreateUniformBuffers();
     void CreateDescriptorPool();
     void CreateDepthResources();
-    void CleanupCommandBuffers();
-    void RecordCommandBuffers(int idx);
 
     void CreateRenderPass();
 
@@ -129,7 +136,7 @@ protected:
 
     vk::DispatchLoaderDynamic dynamicDispatch;
     vk::Instance instance;
-    vk::DebugUtilsMessengerEXT debugMessenger;
+    VkDebugUtilsMessengerEXT debugMessenger;
     vk::PhysicalDevice physicalDevice = VK_NULL_HANDLE;
     vk::Device device;
     vk::Queue graphicsQueue;
@@ -140,12 +147,10 @@ protected:
     vk::SwapchainKHR swapchain;
     std::vector<vk::Image> swapchainImages;
     std::vector<std::shared_ptr<Texture>> swapchainTextures;
-    vk::Format swapchainImageFormat;
     vk::Extent2D swapchainExtent;
-    std::unique_ptr<SwapchainRenderPass> swapchainRenderPass;
+    std::unique_ptr<RenderPass> swapchainRenderPass;
 
     vk::CommandPool commandPool;
-    std::vector<vk::CommandBuffer> commandBuffers;
 
     std::vector<vk::Semaphore> imageAvailableSemaphores;
     std::vector<vk::Semaphore> renderFinishedSemaphores;

@@ -9,8 +9,8 @@
 
 #include <utility>
 
-void Framebuffer::AddAttachment(std::shared_ptr<Texture> texture, vk::ImageUsageFlags usage, vk::Format format) {
-    attachments.push_back(FramebufferAttachment{std::move(texture), usage, format});
+void Framebuffer::AddAttachment(vk::ImageView* texture, vk::ImageUsageFlags usage, vk::Format format) {
+    attachments.push_back(FramebufferAttachment{texture, usage, format});
 }
 
 void Framebuffer::Build(RenderPass *renderPass) {
@@ -18,7 +18,7 @@ void Framebuffer::Build(RenderPass *renderPass) {
 
     std::vector<vk::ImageView> ivAttachments(attachments.size());
     for(int i = 0; i < attachments.size(); i++)
-        ivAttachments[i] = attachments[i].texture->GetView();
+        ivAttachments[i] = *attachments[i].texture;
 
     vk::FramebufferCreateInfo framebufferInfo{};
     framebufferInfo.setRenderPass(renderPass->GetVK());
@@ -51,7 +51,7 @@ void Framebuffer::SetDevice(vk::Device *device) {
     this->device = device;
 }
 
-bool FramebufferAttachment::Is(vk::ImageUsageFlags mask) {
+bool FramebufferAttachment::Is(vk::ImageUsageFlags mask) const {
     return (usageFlags & mask) == mask;
 }
 
@@ -60,6 +60,7 @@ vk::ImageLayout FramebufferAttachment::GetReferenceLayout() {
         return vk::ImageLayout::eDepthStencilAttachmentOptimal;
     return vk::ImageLayout::eColorAttachmentOptimal;
 }
+
 vk::ImageLayout FramebufferAttachment::GetFinalLayout() {
     if (Is(vk::ImageUsageFlagBits::eDepthStencilAttachment))
         return vk::ImageLayout::eDepthStencilAttachmentOptimal;

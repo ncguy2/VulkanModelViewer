@@ -5,6 +5,7 @@
 #ifndef GLMODELVIEWER_RENDERPASS_H
 #define GLMODELVIEWER_RENDERPASS_H
 
+#include <pch.h>
 #include "Framebuffer.h"
 #include <core/VulkanDeviceObject.h>
 #include <vulkan/vulkan.hpp>
@@ -14,52 +15,41 @@ public:
     explicit RenderPass(vk::Device *device);
     void Build();
 
-    virtual void AddFBAttachment(std::shared_ptr<Texture> texture);
+    virtual void AddFBAttachment(unsigned int fboIdx, vk::ImageView* texture, vk::ImageUsageFlags usage, vk::Format format);
+    virtual void AddFBAttachment(unsigned int fboIdx, std::shared_ptr<Texture> texture);
     virtual void SetFBSize(vk::Extent2D size);
     virtual void Dispose();
 
     vk::RenderPass& GetVK();
 
     vk::Format format;
-protected:
-    virtual void BuildFramebuffer();
-
-    Framebuffer framebuffer;
-    vk::RenderPass vkRenderPass;
-};
-
-class SwapchainRenderPass : public RenderPass {
-public:
-    explicit SwapchainRenderPass(vk::Device *device);
-    void SetFBCount(int amount);
-    void AddFBAttachment(std::shared_ptr<Texture> texture) override;
-    void SetFBSize(vk::Extent2D size) override;
-    void Dispose() override;
-
-    void AddFBAttachments(std::vector<std::shared_ptr<Texture>> textures, vk::ImageUsageFlags usage, vk::Format format);
-
-
-    Framebuffer& Get(int i) {
-        if(i == 0)
-            return framebuffer;
-
-        i -= 1;
-
-        if(i >= additionalFramebuffers.size())
-            throw std::invalid_argument("Index too high");
-
-        return additionalFramebuffers[i];
+    Framebuffer& Get(unsigned int i) {
+        return framebuffers[i];
     }
 
     Framebuffer& operator[](int i) {
         return Get(i);
     }
 
-    int Count();
+    void Resize(unsigned int amt);
+    unsigned int Count();
+
+    /**
+     *
+     * @param core Pointer to the VulkanCore instance
+     * @param size The extents of the framebuffer/s
+     * @param textures A vector returning the colour textures created
+     * @param depthTextureList A vector returning the depth textures created
+     * @param bufferCount Amount of framebuffers to create as part of this renderpass
+     * @return
+     */
+    static std::shared_ptr<RenderPass> CreateStandardColourDepthPass(VulkanCore* core, vk::Extent2D size, std::vector<std::shared_ptr<Texture>>& textures, std::vector<std::shared_ptr<Texture>>& depthTextureList, int bufferCount = MAX_FRAMES_IN_FLIGHT);
 
 protected:
-    void BuildFramebuffer() override;
-    std::vector<Framebuffer> additionalFramebuffers;
+    virtual void BuildFramebuffer();
+
+    std::vector<Framebuffer> framebuffers;
+    vk::RenderPass vkRenderPass;
 };
 
 #endif//GLMODELVIEWER_RENDERPASS_H

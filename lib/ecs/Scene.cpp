@@ -11,12 +11,7 @@ std::shared_ptr<Entity> EntityScene::CreateEntity() {
     return e;
 }
 
-void EntityScene::Update(float delta) {
+void EntityScene::Update(float delta, UpdateContext& context) {
     for (auto &item : entities)
-        item->Update(delta);
-}
-
-void EntityScene::Record(uint32_t idx, vk::CommandBuffer &buffer, VulkanCore *core) {
-    for (auto &item : entities)
-        item->Record(idx, buffer, core);
+        item->Update(delta, context);
 }

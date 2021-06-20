@@ -17,6 +17,7 @@
 #include <map>
 #include <cstdint> // Necessary for UINT32_MAX
 #include <algorithm> // Necessary for std::min/std::max
+#include <utility>
 
 #define VK_USE_PLATFORM_WIN32_KHR
 #define GLFW_INCLUDE_VULKAN
@@ -25,7 +26,9 @@
 #include <GLFW/glfw3native.h>
 #include <data/Mesh.h>
 #include <data/vk/CommandBuffer.h>
+#include <data/vk/Camera.h>
 #include <core/Screen.h>
+#include <data/render/MeshRenderer.h>
 
 #define TEST(x) x != vk::Result::eSuccess
 #define TEST_EXC(x, msg) if(x != vk::Result::eSuccess) throw std::runtime_error(msg);
@@ -37,8 +40,6 @@ const bool enableValidationLayers = true;
 #define IN_DEBUG(x) x,
 const bool enableValidationLayers = true;
 #endif
-
-const int MAX_FRAMES_IN_FLIGHT = 3;
 
 extern std::string CWD;
 
@@ -61,12 +62,17 @@ static void keyCallback(GLFWwindow* window, int key, int scancode, int action, i
     core->OnKey(key, scancode, action, mods);
 }
 
-static vk::Result CreateDebugUtilsMessengerEXT(vk::Instance instance, const vk::DebugUtilsMessengerCreateInfoEXT* pCreateInfo, const vk::AllocationCallbacks* pAllocator, vk::DebugUtilsMessengerEXT* pDebugMessenger) {
-    return instance.createDebugUtilsMessengerEXT(pCreateInfo, pAllocator, pDebugMessenger, vk::DispatchLoaderDynamic());
+static vk::Result CreateDebugUtilsMessengerEXT(vk::Instance instance, const vk::DebugUtilsMessengerCreateInfoEXT* pCreateInfo, const vk::AllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger) {
+    auto func = (PFN_vkCreateDebugUtilsMessengerEXT) vkGetInstanceProcAddr((VkInstance) instance, "vkCreateDebugUtilsMessengerEXT");
+    if (func != nullptr)
+        return vk::Result(func((VkInstance) instance, (VkDebugUtilsMessengerCreateInfoEXT*) pCreateInfo, (VkAllocationCallbacks*) pAllocator, (VkDebugUtilsMessengerEXT*) pDebugMessenger));
+    return vk::Result(VK_ERROR_EXTENSION_NOT_PRESENT);
 }
 
-static void DestroyDebugUtilsMessengerEXT(vk::Instance instance, vk::DebugUtilsMessengerEXT debugMessenger, const vk::AllocationCallbacks* pAllocator) {
-    instance.destroyDebugUtilsMessengerEXT(debugMessenger, pAllocator, vk::DispatchLoaderDynamic());
+static void DestroyDebugUtilsMessengerEXT(vk::Instance instance, VkDebugUtilsMessengerEXT debugMessenger, const vk::AllocationCallbacks* pAllocator) {
+    auto func = (PFN_vkDestroyDebugUtilsMessengerEXT) vkGetInstanceProcAddr((VkInstance) instance, "vkDestroyDebugUtilsMessengerEXT");
+    if (func != nullptr)
+        func((VkInstance) instance, (VkDebugUtilsMessengerEXT) debugMessenger, (VkAllocationCallbacks*) pAllocator);
 }
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
@@ -225,7 +231,6 @@ GLFWwindow* VulkanCore::InitVulkan() {
     CreateUniformBuffers();
     CreateGraphicsPipeline();
     CreateCommandPool();
-    CreateCommandBuffers();
     CreateSyncObjects();
 
     return window;
@@ -248,9 +253,6 @@ void VulkanCore::Cleanup() {
 
     device.destroyCommandPool(commandPool);
 
-    if (enableValidationLayers) {
-        DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
-    }
     device.destroy();
     instance.destroySurfaceKHR(surface);
     instance.destroy();
@@ -496,11 +498,17 @@ vk::ShaderModule VulkanCore::CreateShaderModule(std::vector<char> source) {
 }
 
 void VulkanCore::CreateRenderPass() {
-    swapchainRenderPass = std::make_unique<SwapchainRenderPass>(&device);
-    swapchainRenderPass->SetFBCount(swapchainTextures.size());
+    swapchainRenderPass = std::make_unique<RenderPass>(&device);
+    swapchainRenderPass->Resize(swapchainTextures.size());
     swapchainRenderPass->SetFBSize(swapchainExtent);
-    swapchainRenderPass->AddFBAttachments(swapchainTextures, vk::ImageUsageFlagBits::eColorAttachment, swapchainImageFormat);
-    swapchainRenderPass->AddFBAttachment(depthTexturePtr);
+    unsigned int idx = 0;
+    for (const auto &tex : swapchainTextures) {
+        tex->usageFlags = vk::ImageUsageFlagBits::eColorAttachment;
+        tex->format = swapchainImageFormat;
+        swapchainRenderPass->AddFBAttachment(idx, tex);
+        swapchainRenderPass->AddFBAttachment(idx, depthTexturePtr);
+        idx++;
+    }
 
     swapchainRenderPass->Build();
 }
@@ -514,19 +522,6 @@ void VulkanCore::CreateCommandPool(){
 
     if(device.createCommandPool(&poolInfo, nullptr, &commandPool) != vk::Result::eSuccess)
         throw std::runtime_error("Failed to create command pool");
-}
-
-void VulkanCore::CreateCommandBuffers() {
-    commandBuffers.resize(swapchainRenderPass->Count());
-
-    vk::CommandBufferAllocateInfo allocInfo{};
-    allocInfo.setCommandPool(commandPool);
-    allocInfo.setLevel(vk::CommandBufferLevel::ePrimary);
-    allocInfo.setCommandBufferCount(commandBuffers.size());
-
-    if(device.allocateCommandBuffers(&allocInfo, commandBuffers.data()) != vk::Result::eSuccess)
-        throw std::runtime_error("Failed to allocate command buffers");
-
 }
 
 void VulkanCore::CreateSyncObjects() {
@@ -560,48 +555,38 @@ void VulkanCore::MainLoop() {
     device.waitIdle();
 }
 
-void VulkanCore::RecordCommandBuffers(int i) {
-    commandBuffers[i].reset(vk::CommandBufferResetFlagBits::eReleaseResources);
-
-    vk::CommandBufferBeginInfo beginInfo{};
-    beginInfo.flags = vk::CommandBufferUsageFlagBits::eSimultaneousUse;
-
-    if(TEST(commandBuffers[i].begin(&beginInfo)))
-        throw std::runtime_error("Failed to begin recording command buffer");
-
-    vk::RenderPassBeginInfo renderPassInfo{};
-    renderPassInfo.setRenderPass(swapchainRenderPass->GetVK());
-    renderPassInfo.setFramebuffer(swapchainRenderPass->Get(i).GetVK());
-    renderPassInfo.renderArea.setOffset({0, 0});
-    renderPassInfo.renderArea.setExtent(swapchainExtent);
-    std::array<vk::ClearValue, 2> clearValues{};
-    clearValues[0].color.setFloat32({0, 0, 0, 1});
-    clearValues[1].depthStencil.setDepth(1.0f).setStencil(0);
-    renderPassInfo.setClearValues(clearValues);
-
-    commandBuffers[i].beginRenderPass(&renderPassInfo, vk::SubpassContents::eInline);
-
-    if(currentScreen)
-        currentScreen->Record(i, commandBuffers[i]);
-
-    commandBuffers[i].endRenderPass();
-    commandBuffers[i].end();
-}
-
 void VulkanCore::DrawFrame() {
-
-
     std::chrono::time_point<std::chrono::steady_clock> currentTime;
     currentTime = std::chrono::high_resolution_clock::now();
     float deltaTime = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - previousTime).count();
     previousTime = currentTime;
 
-    if(currentScreen)
+    EntityScene* scene;
+    UpdateContext updateContext;
+
+    updateContext.camera = nullptr;
+    updateContext.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    updateContext.proj = glm::perspective(glm::radians(45.0f), swapchainExtent.width / (float) swapchainExtent.height, 0.1f, 10.0f);
+    updateContext.proj[1][1] *= -1;
+
+    if(currentScreen) {
         currentScreen->Update(deltaTime);
+        scene = currentScreen->GetScenePtr();
+        scene->Update(deltaTime, updateContext);
+        SetViewProj(currentFrame, updateContext.view, updateContext.proj);
+    }
 
     CHECK(device.waitForFences(1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX));
 
-    RecordCommandBuffers(currentFrame);
+    RendererContext renderContext;
+    renderContext.bufferIdx = currentFrame;
+    renderContext.commandPool = &commandPool;
+    renderContext.device = &device;
+    renderContext.renderPass = swapchainRenderPass.get();
+    renderContext.core = this;
+    renderContext.extent = swapchainExtent;
+    renderContext.data = updateContext;
+    render(renderContext);
 
     uint32_t imageIndex;
     vk::Result result = device.acquireNextImageKHR(swapchain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
@@ -619,28 +604,31 @@ void VulkanCore::DrawFrame() {
         CHECK(device.waitForFences(1, &imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX));
     imagesInFlight[imageIndex] = inFlightFences[currentFrame];
 
-    vk::SubmitInfo submitInfo{};
+    // Dispatch command buffers to graphics queue
+    if(updateContext.camera) {
+        updateContext.camera->Render(device, graphicsQueue, imageAvailableSemaphores[currentFrame],
+                                     renderFinishedSemaphores[currentFrame], inFlightFences[currentFrame], renderContext.commandBuffers);
+    } else{
+        vk::SubmitInfo submitInfo{};
 
-    vk::Semaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]};
-    vk::PipelineStageFlags waitStages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
-    submitInfo.setWaitSemaphoreCount(1);
-    submitInfo.setPWaitSemaphores(waitSemaphores);
-    submitInfo.setPWaitDstStageMask(waitStages);
+        vk::PipelineStageFlags waitStages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
+        submitInfo.setWaitSemaphoreCount(1);
+        submitInfo.setPWaitSemaphores(&imageAvailableSemaphores[currentFrame]);
+        submitInfo.setPWaitDstStageMask(waitStages);
 
-    vk::Semaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]};
-    submitInfo.setSignalSemaphoreCount(1);
-    submitInfo.setPSignalSemaphores(signalSemaphores);
+        submitInfo.setSignalSemaphoreCount(1);
+        submitInfo.setPSignalSemaphores(&renderFinishedSemaphores[currentFrame]);
 
-    submitInfo.setCommandBufferCount(1);
-    submitInfo.setPCommandBuffers(&commandBuffers[imageIndex]);
+        submitInfo.setCommandBuffers(renderContext.commandBuffers);
 
-    CHECK(device.resetFences(1, &inFlightFences[currentFrame]));
+        CHECK(device.resetFences(1, &inFlightFences[currentFrame]));
+        CHECK(graphicsQueue.submit(1, &submitInfo, inFlightFences[currentFrame]));
+    }
 
-    CHECK(graphicsQueue.submit(1, &submitInfo, inFlightFences[currentFrame]));
-
+    // Present swapchain to screen
     vk::PresentInfoKHR presentInfo{};
     presentInfo.setWaitSemaphoreCount(1);
-    presentInfo.setPWaitSemaphores(signalSemaphores);
+    presentInfo.setPWaitSemaphores(&renderFinishedSemaphores[currentFrame]);
 
     vk::SwapchainKHR swapchains[] = {swapchain};
     presentInfo.setSwapchainCount(1);
@@ -685,7 +673,6 @@ void VulkanCore::UpdateUniformBuffer(uint32_t currentImage) {
 void VulkanCore::CleanupSwapchain() {
     swapchainRenderPass->Dispose();
 
-    device.freeCommandBuffers(commandPool, commandBuffers.size(), commandBuffers.data());
     swapchainTextures.clear();
     device.destroySwapchainKHR(swapchain);
 
@@ -715,7 +702,6 @@ void VulkanCore::RecreateSwapchain() {
     CreateGraphicsPipeline();
     CreateUniformBuffers();
     CreateDescriptorPool();
-    CreateCommandBuffers();
     swapchainRecreated(this, width, height);
     currentScreen->Resize(width, height);
 }
@@ -802,12 +788,13 @@ std::vector<vk::Buffer>& VulkanCore::GetUniformBuffers() {
 }
 
 void VulkanCore::CreateDepthResources() {
-    vk::Format depthFormat = FindDepthFormat();
-    depthTexturePtr = CreateTexture(depthFormat, vk::ImageAspectFlagBits::eDepth);
-    depthTexturePtr->usageFlags |= vk::ImageUsageFlagBits::eDepthStencilAttachment;
-    depthTexturePtr->SetSize(swapchainExtent.width, swapchainExtent.height);
-    depthTexturePtr->Create(swapchainExtent.width * swapchainExtent.height * 4);
-//    TransitionImageLayout(depthTexturePtr->GetImage(), depthFormat, vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthStencilAttachmentOptimal);
+//    vk::Format depthFormat = FindDepthFormat();
+//    depthTexturePtr = CreateTexture(depthFormat, vk::ImageAspectFlagBits::eDepth);
+//    depthTexturePtr->usageFlags |= vk::ImageUsageFlagBits::eDepthStencilAttachment;
+//    depthTexturePtr->SetSize(swapchainExtent.width, swapchainExtent.height);
+//    depthTexturePtr->Create(swapchainExtent.width * swapchainExtent.height * 4);
+////    TransitionImageLayout(depthTexturePtr->GetImage(), depthFormat, vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthStencilAttachmentOptimal);
+    depthTexturePtr = CreateDepthTexture(swapchainExtent);
 }
 
 vk::Format VulkanCore::FindSupportedFormat(const std::vector<vk::Format> &candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features) {
@@ -825,7 +812,7 @@ vk::Format VulkanCore::FindSupportedFormat(const std::vector<vk::Format> &candid
 }
 
 vk::Format VulkanCore::FindDepthFormat() {
-    return FindSupportedFormat({vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint},
+    return FindSupportedFormat({vk::Format::eD32Sfloat, /*vk::Format::eD32SfloatS8Uint,*/ vk::Format::eD24UnormS8Uint},
                                vk::ImageTiling::eOptimal,
                                vk::FormatFeatureFlagBits::eDepthStencilAttachment);
 }
@@ -966,15 +953,6 @@ std::shared_ptr<ShaderProgram> VulkanCore::CreateShaderProgram() {
     return std::make_shared<ShaderProgram>(this, device);
 }
 
-void VulkanCore::CleanupCommandBuffers() {
-    device.freeCommandBuffers(commandPool, commandBuffers.size(), commandBuffers.data());
-}
-
-void VulkanCore::RecreateCommandBuffer() {
-    CleanupCommandBuffers();
-    CreateCommandBuffers();
-}
-
 void VulkanCore::CompileShader(const std::shared_ptr<ShaderProgram>& shaderPtr) {
     CompileShader(shaderPtr.get());
 }
@@ -984,6 +962,15 @@ void VulkanCore::CompileShader(ShaderProgram* shaderPtr) {
 
 std::shared_ptr<Texture> VulkanCore::CreateTexture(vk::Format format, vk::ImageAspectFlags aspectFlags) {
     return std::make_shared<Texture>(this, device, format, aspectFlags);
+}
+
+std::shared_ptr<Texture> VulkanCore::CreateDepthTexture(vk::Extent2D size) {
+    vk::Format depthFormat = FindDepthFormat();
+    std::shared_ptr<Texture> ptr = CreateTexture(depthFormat, vk::ImageAspectFlagBits::eDepth);
+    ptr->usageFlags |= vk::ImageUsageFlagBits::eDepthStencilAttachment;
+    ptr->SetSize(size.width, size.height);
+    ptr->Create(size.width * size.height * 4);
+    return ptr;
 }
 
 void VulkanCore::OnKey(int key, int scancode, int action, int mods) {
@@ -996,20 +983,24 @@ void VulkanCore::SetScreen(std::shared_ptr<Screen> newScreenPtr) {
     if(currentScreen) {
         currentScreen->Hide();
     }
-    currentScreen = newScreenPtr;
+    currentScreen = std::move(newScreenPtr);
     if(!currentScreen)
         return;
 
     CoreScreenComponents c = {
             this,
-            &device
+            &device,
+            &commandPool
     };
     currentScreen->AssignCoreComponents(c);
+    currentScreen->Resize(swapchainExtent.width, swapchainExtent.height);
 
     if(!currentScreen->IsCreated())
         currentScreen->Create();
 
     currentScreen->Show();
+}
 
-    RecreateCommandBuffer();
+vk::Device *VulkanCore::GetDevicePtr() {
+    return &device;
 }
