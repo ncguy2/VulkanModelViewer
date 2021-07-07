@@ -10,11 +10,13 @@
 
 class VulkanCore;
 class Mesh;
+class PluginManager;
 
 struct CoreScreenComponents {
     VulkanCore* core;
     vk::Device* device;
     vk::CommandPool* commandPool;
+    PluginManager* pluginManager;
 };
 
 class Screen {

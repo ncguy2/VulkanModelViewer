@@ -94,6 +94,8 @@ void RenderPass::SetFBSize(vk::Extent2D size) {
 void RenderPass::Dispose() {
     for (auto &item : framebuffers)
         item.Dispose();
+
+    device->destroyRenderPass(vkRenderPass);
 }
 
 unsigned int RenderPass::Count() {
@@ -104,6 +106,7 @@ void RenderPass::Resize(unsigned int amt) {
 }
 
 std::shared_ptr<RenderPass> RenderPass::CreateStandardColourDepthPass(VulkanCore* core, vk::Extent2D size, std::vector<std::shared_ptr<Texture>>& textureList, std::vector<std::shared_ptr<Texture>>& depthTextureList, int bufferCount) {
+    static int RenderPassCounter = 0;
     std::shared_ptr<RenderPass> pass = std::make_shared<RenderPass>(core->GetDevicePtr());
     pass->Resize(bufferCount);
 
@@ -124,5 +127,8 @@ std::shared_ptr<RenderPass> RenderPass::CreateStandardColourDepthPass(VulkanCore
     pass->SetFBSize(size);
 
     pass->Build();
+
+    core->NameObject(pass->GetVK(), "Render Pass " + std::to_string(RenderPassCounter));
+
     return pass;
 }

@@ -71,10 +71,10 @@ void BlitRenderer::Setup(RendererSetupContext &context) {
 
     mesh = std::make_shared<Mesh>();
     std::vector<Vertex> vertices = {
-            Vertex({-0.5f, -0.5f,  0.0f}, {1, 0, 0}, {0, 0}),
-            Vertex({ 0.5f, -0.5f,  0.0f}, {0, 1, 0}, {1, 0}),
-            Vertex({-0.5f,  0.5f,  0.0f}, {0, 0, 1}, {0, 1}),
-            Vertex({ 0.5f,  0.5f,  0.0f}, {1, 1, 1}, {1, 1})
+            Vertex({-1.0f, -1.0f,  0.0f}, {1, 0, 0}, {0, 0}),
+            Vertex({ 1.0f, -1.0f,  0.0f}, {0, 1, 0}, {1, 0}),
+            Vertex({-1.0f,  1.0f,  0.0f}, {0, 0, 1}, {0, 1}),
+            Vertex({ 1.0f,  1.0f,  0.0f}, {1, 1, 1}, {1, 1})
     };
     std::vector<Triangle> indices = {
             Triangle(1, 0, 2),

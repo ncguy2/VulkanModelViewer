@@ -57,6 +57,22 @@ static void framebufferResizeCallback(GLFWwindow* window, int width, int height)
     core->framebufferResized = true;
 }
 
+static void dropCallback(GLFWwindow* window, int droppedPathCount, const char** paths) {
+    if(droppedPathCount <= 0)
+        return;
+
+    auto core = reinterpret_cast<VulkanCore*>(glfwGetWindowUserPointer(window));
+
+    std::vector<FilePath> droppedPaths(droppedPathCount);
+
+    std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> convert;
+
+    for(int i = 0; i < droppedPathCount; i++)
+        droppedPaths[i] = convert.from_bytes(paths[i]);
+
+    core->drop(droppedPaths);
+}
+
 static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     auto core = reinterpret_cast<VulkanCore*>(glfwGetWindowUserPointer(window));
     core->OnKey(key, scancode, action, mods);
@@ -66,6 +82,13 @@ static vk::Result CreateDebugUtilsMessengerEXT(vk::Instance instance, const vk::
     auto func = (PFN_vkCreateDebugUtilsMessengerEXT) vkGetInstanceProcAddr((VkInstance) instance, "vkCreateDebugUtilsMessengerEXT");
     if (func != nullptr)
         return vk::Result(func((VkInstance) instance, (VkDebugUtilsMessengerCreateInfoEXT*) pCreateInfo, (VkAllocationCallbacks*) pAllocator, (VkDebugUtilsMessengerEXT*) pDebugMessenger));
+    return vk::Result(VK_ERROR_EXTENSION_NOT_PRESENT);
+}
+
+static vk::Result SetDebugUtilsObjectNameEXT(vk::Device device, const vk::DebugUtilsObjectNameInfoEXT* info) {
+    static auto func = (PFN_vkSetDebugUtilsObjectNameEXT) vkGetDeviceProcAddr((VkDevice) device, "vkSetDebugUtilsObjectNameEXT");
+    if (func != nullptr)
+        return vk::Result(func((VkDevice) device, (VkDebugUtilsObjectNameInfoEXT*) info));
     return vk::Result(VK_ERROR_EXTENSION_NOT_PRESENT);
 }
 
@@ -206,6 +229,7 @@ GLFWwindow* VulkanCore::InitVulkan() {
     glfwMakeContextCurrent(window);
     glfwSetWindowUserPointer(window, this);
     glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
+    glfwSetDropCallback(window, dropCallback);
     glfwSetKeyCallback(window, keyCallback);
 
     uint32_t extensionCount = 0;
@@ -233,10 +257,17 @@ GLFWwindow* VulkanCore::InitVulkan() {
     CreateCommandPool();
     CreateSyncObjects();
 
+    pluginManager.Initialise(this);
+
     return window;
 }
 
 void VulkanCore::Cleanup() {
+
+    if(currentScreen)
+        currentScreen->Dispose();
+
+    pluginManager.Dispose();
 
     if(enableValidationLayers)
         DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
@@ -247,7 +278,8 @@ void VulkanCore::Cleanup() {
         device.destroyFence(inFlightFences[i]);
     }
 
-    depthTexturePtr.reset();
+    depthTexturePtr->Dispose();
+    depthTexturePtr = nullptr;
 
     CleanupSwapchain();
 
@@ -460,13 +492,20 @@ void VulkanCore::CreateSwapChain() {
     if (device.createSwapchainKHR(&createInfo, nullptr, &swapchain) != vk::Result::eSuccess)
         throw std::runtime_error("Failed to create swap chain");
 
+    NameObject(swapchain, "Screen swapchain");
+
     swapchainImages = device.getSwapchainImagesKHR(swapchain);
     swapchainImageFormat = surfaceFormat.format;
     swapchainExtent = extent;
 
+    for(int i = 0; i < swapchainImages.size(); i++) {
+        NameObject(swapchainImages[i], "Swapchain image " + std::to_string(i));
+    }
+
     swapchainTextures.resize(swapchainImages.size());
     for(int i = 0; i < swapchainImages.size(); i++) {
         swapchainTextures[i] = std::make_shared<Texture>(this, device, swapchainImageFormat, vk::ImageAspectFlagBits::eColor);
+        swapchainTextures[i]->SetName("SwapchainTexture " + std::to_string(i));
         swapchainTextures[i]->Set(swapchainImages[i]);
     }
 }
@@ -511,6 +550,7 @@ void VulkanCore::CreateRenderPass() {
     }
 
     swapchainRenderPass->Build();
+    NameObject(swapchainRenderPass->GetVK(), "Swapchain Render Pass");
 }
 
 void VulkanCore::CreateCommandPool(){
@@ -673,6 +713,12 @@ void VulkanCore::UpdateUniformBuffer(uint32_t currentImage) {
 void VulkanCore::CleanupSwapchain() {
     swapchainRenderPass->Dispose();
 
+
+    for(int i = 0; i < swapchainTextures.size(); i++) {
+        auto item = swapchainTextures[i];
+        item->Dispose();
+    }
+
     swapchainTextures.clear();
     device.destroySwapchainKHR(swapchain);
 
@@ -765,15 +811,20 @@ void VulkanCore::CreateUniformBuffers() {
 }
 
 void VulkanCore::CreateDescriptorPool() {
-    std::array<vk::DescriptorPoolSize, 2> poolSizes{};
-    poolSizes[0].setType(vk::DescriptorType::eUniformBuffer);
-    poolSizes[0].setDescriptorCount(swapchainImages.size() * 5);
-    poolSizes[1].setType(vk::DescriptorType::eCombinedImageSampler);
-    poolSizes[1].setDescriptorCount(swapchainImages.size() * 5);
+//    std::array<vk::DescriptorPoolSize, 2> poolSizes{};
+//    poolSizes[0].setType(vk::DescriptorType::eUniformBuffer);
+//    poolSizes[0].setDescriptorCount(swapchainImages.size() * 32);
+//    poolSizes[1].setType(vk::DescriptorType::eCombinedImageSampler);
+//    poolSizes[1].setDescriptorCount(swapchainImages.size() * 32);
+
+    std::array<vk::DescriptorPoolSize, 1> poolSizes{};
+    poolSizes[0].setType(vk::DescriptorType::eMutableVALVE);
+    poolSizes[0].setDescriptorCount(16);
 
     vk::DescriptorPoolCreateInfo poolInfo{};
     poolInfo.setPoolSizes(poolSizes);
-    poolInfo.setMaxSets(swapchainImages.size()*5);
+    poolInfo.setMaxSets(1024);
+    poolInfo.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet;
 
     CHECK(device.createDescriptorPool(&poolInfo, nullptr, &descriptorPool));
 }
@@ -800,6 +851,7 @@ void VulkanCore::CreateDepthResources() {
 vk::Format VulkanCore::FindSupportedFormat(const std::vector<vk::Format> &candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features) {
     for (vk::Format format : candidates) {
         vk::FormatProperties props;
+
         physicalDevice.getFormatProperties(format, &props);
 
         if(tiling == vk::ImageTiling::eLinear && (props.linearTilingFeatures & features) == features)
@@ -896,7 +948,7 @@ void VulkanCore::TransitionImageLayout(vk::Image& image, vk::Format format, vk::
     cmdBuffer.EndAndSubmit(graphicsQueue);
 }
 
-void VulkanCore::CopyBufferToImage(vk::Buffer &buffer, vk::Image &image, uint32_t width, uint32_t height) {
+void VulkanCore::CopyBufferToImage(vk::Buffer &buffer, vk::Image &image, uint32_t width, uint32_t height, int offsetX, int offsetY) {
     CommandBuffer cmdBuffer(device, vk::CommandBufferLevel::ePrimary, commandPool);
 
     cmdBuffer.Begin(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
@@ -910,7 +962,7 @@ void VulkanCore::CopyBufferToImage(vk::Buffer &buffer, vk::Image &image, uint32_
     region.imageSubresource.setBaseArrayLayer(0);
     region.imageSubresource.setLayerCount(1);
 
-    region.imageOffset = vk::Offset3D{0, 0, 0};
+    region.imageOffset = vk::Offset3D{offsetX, offsetY, 0};
     region.imageExtent = vk::Extent3D{ width, height, 1 };
 
     cmdBuffer.Commands().copyBufferToImage(buffer, image, vk::ImageLayout::eTransferDstOptimal, 1, &region);
@@ -965,8 +1017,10 @@ std::shared_ptr<Texture> VulkanCore::CreateTexture(vk::Format format, vk::ImageA
 }
 
 std::shared_ptr<Texture> VulkanCore::CreateDepthTexture(vk::Extent2D size) {
+    static int depthTextureCounter = 0;
     vk::Format depthFormat = FindDepthFormat();
     std::shared_ptr<Texture> ptr = CreateTexture(depthFormat, vk::ImageAspectFlagBits::eDepth);
+    ptr->SetName("Depth Texture " + std::to_string(depthTextureCounter++));
     ptr->usageFlags |= vk::ImageUsageFlagBits::eDepthStencilAttachment;
     ptr->SetSize(size.width, size.height);
     ptr->Create(size.width * size.height * 4);
@@ -990,7 +1044,8 @@ void VulkanCore::SetScreen(std::shared_ptr<Screen> newScreenPtr) {
     CoreScreenComponents c = {
             this,
             &device,
-            &commandPool
+            &commandPool,
+            &this->pluginManager
     };
     currentScreen->AssignCoreComponents(c);
     currentScreen->Resize(swapchainExtent.width, swapchainExtent.height);
@@ -1003,4 +1058,23 @@ void VulkanCore::SetScreen(std::shared_ptr<Screen> newScreenPtr) {
 
 vk::Device *VulkanCore::GetDevicePtr() {
     return &device;
+}
+
+void VulkanCore::NameObject(uint64_t handle, vk::ObjectType type, std::string name) {
+    vk::DebugUtilsObjectNameInfoEXT nameInfo{};
+
+
+    std::string a = (std::to_string(handle) + name);
+    void* strPtr = malloc(a.size() * sizeof(char));
+    memcpy(strPtr, a.data(), a.size());
+
+    const char* str = reinterpret_cast<const char*>(strPtr);
+
+    nameInfo.objectHandle = handle;
+    nameInfo.objectType = type;
+    nameInfo.pObjectName = str;
+
+//    device.setDebugUtilsObjectNameEXT(nameInfo);
+    SetDebugUtilsObjectNameEXT(device, &nameInfo);
+    free(strPtr);
 }

@@ -13,10 +13,13 @@ class Texture {
 public:
     Texture(VulkanCore* core, vk::Device& device, vk::Format format, vk::ImageAspectFlags aspectFlags);
 
+    void SetName(std::wstring name);
+    void SetName(std::string name);
     void LoadFromFile(const char* file, bool hasAlpha = true);
     void Create(int size, void* data = nullptr);
     void Set(vk::Image& image);
     void Dispose();
+    void Transition(vk::ImageLayout oldLayout, vk::ImageLayout newLayout);
 
     void SetSize(int width, int height);
 
@@ -31,6 +34,7 @@ public:
 protected:
     void CreateView();
 
+    std::string name;
     vk::Device* device;
     VulkanCore* core;
 

@@ -16,4 +16,9 @@
 #define MAX_FRAMES_IN_FLIGHT 3
 #endif // MAX_FRAMES_IN_FLIGHT
 
+#define CAST_STR_WSTR(str) std::wstring((wchar_t*) str.data(), str.size() / 2)
+#define CAST_WSTR_STR(wstr) std::string((char*) wstr.data(), wstr.size() * 2)
+
+
+
 #endif//GLMODELVIEWER_PCH_H

@@ -93,9 +93,13 @@ void Mesh::SetShaderProgram(std::shared_ptr<ShaderProgram> shader) {
 
 void Mesh::Dispose() {
     if(devicePtr) {
-        devicePtr->destroyBuffer(vertexBuffer);
-        devicePtr->destroyBuffer(indexBuffer);
-        devicePtr->freeMemory(bufferMemory);
-        devicePtr->freeMemory(indexBufferMemory);
+        if(vertexBuffer)
+            devicePtr->destroyBuffer(vertexBuffer);
+        if(indexBuffer)
+            devicePtr->destroyBuffer(indexBuffer);
+        if(bufferMemory)
+            devicePtr->freeMemory(bufferMemory);
+        if(indexBufferMemory)
+            devicePtr->freeMemory(indexBufferMemory);
     }
 }

@@ -3,18 +3,30 @@
 #include <cstring>
 #include <thread>
 #include <example/ExampleScreen.h>
-
+#include <plugins/PluginManager.h>
+#include <plugins/PluginHost.h>
 
 #include <core/VulkanCore.hpp>
 #include <string>
 
+void PlatformStartup();
+
 #ifdef WIN32
+
 #include <windows.h>
+#include <io.h>
+
+void PlatformStartup() {
+}
+
 std::string cwd() {
     char buf[256];
     GetCurrentDirectoryA(256, buf);
     return std::string(buf) + '\\';
 }
+
+#else
+void PlatformStartup() {}
 #endif
 
 std::string EXE_PATH;
@@ -36,20 +48,39 @@ std::vector<char> ReadFile(const std::string& filename) {
     return buffer;
 }
 
+std::string ConvertWideToNormal(std::wstring wide) {
+    std::string n;
+
+    for (auto &item : wide  ) {
+        int i = (int) item;
+        char a = (char) ((i & 0xFF00) >> 8);
+        char b = (char) (i & 0x00FF);
+
+        if(a != '\0')
+            n.push_back(a);
+        if(b != '\0')
+            n.push_back(b);
+    }
+
+    return n;
+}
+
 int shaderIdx = 0;
 bool finish = false;
 
 Delegate<VulkanCore*, int, int, int, int>::Signature handle;
 
 int main(int _, char** argv) {
-    EXE_PATH = std::string(argv[0]);
-    CWD = cwd();
-    std::cout << "EXE Path: " << EXE_PATH.c_str() << std::endl;
-    std::cout << "CWD: " << CWD.c_str() << std::endl;
+    PlatformStartup();
 
-    auto pid = _getpid();
-    std::cout << "PID: " << pid << std::endl;
-    getchar();
+//    EXE_PATH = std::string(argv[0]);
+//    CWD = cwd();
+//    std::cout << "EXE Path: " << EXE_PATH.c_str() << std::endl;
+//    std::cout << "CWD: " << CWD.c_str() << std::endl;
+//
+//    auto pid = _getpid();
+//    std::cout << "PID: " << pid << std::endl;
+//    getchar();
 
     VulkanCore core;
     core.InitVulkan();

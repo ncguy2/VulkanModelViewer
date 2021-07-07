@@ -62,7 +62,15 @@ public:
     void SetTexture(vk::ImageView imageView, int index);
     void SetTexture(Texture texture, int index);
 
+    void SetViewport(vk::Viewport viewport);
+    void SetScissor(vk::Rect2D scissor);
+    void ResetScissor();
+
     vk::PipelineLayout& GetLayout();
+
+    void SetName(std::string name);
+
+    void AddPushConstant(int offset, int size, vk::ShaderStageFlags stageFlags);
 
 protected:
     void BuildDescriptorSetLayout();
@@ -72,10 +80,13 @@ protected:
     VulkanCore* core;
     vk::Device* device;
 
+    std::string name;
     std::vector<ShaderStage> shaderStages;
     vk::DescriptorSetLayout descriptorSetLayout;
     vk::PipelineLayout pipelineLayout;
     vk::Pipeline pipeline;
+    vk::Viewport viewport;
+    vk::Rect2D scissor;
     std::vector<vk::DescriptorSet> descriptorSets;
 
     std::vector<TextureSampler> samplers;
@@ -85,6 +96,7 @@ protected:
     void UpdateDescriptorSets();
     int imageCount;
     std::vector<vk::Buffer> uniformBuffers;
+    std::vector<vk::PushConstantRange> pushConstantInfo;
 };
 
 #endif//GLMODELVIEWER_SHADER_H

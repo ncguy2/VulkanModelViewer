@@ -5,10 +5,11 @@
 #ifndef GLMODELVIEWER_EXAMPLESCREEN_H
 #define GLMODELVIEWER_EXAMPLESCREEN_H
 
-#include <core/VulkanCore.hpp>
 #include <core/Screen.h>
+#include <core/VulkanCore.hpp>
 #include <data/Mesh.h>
 #include <memory>
+#include <plugins/api/Plugin.h>
 
 class MeshRenderer;
 class BlitRenderer;
@@ -25,24 +26,29 @@ public:
     void AddMesh(const std::shared_ptr<Mesh>& mesh);
 
 protected:
-    std::shared_ptr<Entity> entity;
+    void CleanupMeshes();
+    void LoadMeshes(Plugins::FilePath path);
+
+    std::vector<std::shared_ptr<Entity>> entities;
     std::shared_ptr<Entity> camera;
 
     // Render
     std::shared_ptr<MeshRenderer> meshRenderer;
-    std::shared_ptr<BlitRenderer> blitRenderer;
     std::shared_ptr<RenderPass> offscreenRenderPass;
     std::vector<std::shared_ptr<Texture>> offscreenColourTextures;
     std::vector<std::shared_ptr<Texture>> offscreenDepthTextures;
 
 
-    std::shared_ptr<ShaderProgram> shader;
-    std::shared_ptr<Texture> texture;
+    std::vector<std::shared_ptr<ShaderProgram>> shaders;
+    std::vector<std::shared_ptr<Texture>> textures;
     std::vector<std::shared_ptr<Mesh>> meshes;
     float t;
     int width, height;
+    int selectedMeshIdx = -1;
+    std::shared_ptr<Mesh> GetSelectedMesh();
 
     VulkanCore::Render::Signature renderFunc;
+    VulkanCore::Drop::Signature dropFunc;
 };
 
 #endif//GLMODELVIEWER_EXAMPLESCREEN_H

@@ -5,6 +5,8 @@
 #ifndef GLMODELVIEWER_MESH_H
 #define GLMODELVIEWER_MESH_H
 
+#include "MeshData.h"
+
 #include "Shader.h"
 #include "ecs/Transform.h"
 #include <glm/glm.hpp>
@@ -12,52 +14,6 @@
 #include <vulkan/vulkan.hpp>
 
 class VulkanCore;
-
-struct Vertex {
-    glm::vec3 pos;
-    glm::vec3 colour;
-    glm::vec2 uv;
-
-    Vertex(const glm::vec3 &pos, const glm::vec3 &colour, const glm::vec2 &uv) : pos(pos), colour(colour), uv(uv) {}
-
-    static vk::VertexInputBindingDescription getBindingDescription() {
-        vk::VertexInputBindingDescription bindingDescription{};
-        bindingDescription.binding = 0;
-        bindingDescription.stride = sizeof(Vertex);
-        bindingDescription.inputRate = vk::VertexInputRate::eVertex;
-        return bindingDescription;
-    }
-
-    static std::array<vk::VertexInputAttributeDescription, 3> getAttributeDescriptions() {
-        std::array<vk::VertexInputAttributeDescription, 3> attributeDescriptions{};
-        attributeDescriptions[0].binding = 0;
-        attributeDescriptions[0].location = 0;
-        attributeDescriptions[0].format = vk::Format::eR32G32B32Sfloat;
-        attributeDescriptions[0].offset = offsetof(Vertex, pos);
-
-        attributeDescriptions[1].binding = 0;
-        attributeDescriptions[1].location = 1;
-        attributeDescriptions[1].format = vk::Format::eR32G32B32Sfloat;
-        attributeDescriptions[1].offset = offsetof(Vertex, colour);
-
-        attributeDescriptions[2].binding = 0;
-        attributeDescriptions[2].location = 2;
-        attributeDescriptions[2].format = vk::Format::eR32G32Sfloat;
-        attributeDescriptions[2].offset = offsetof(Vertex, uv);
-
-        return attributeDescriptions;
-    }
-};
-
-struct Triangle {
-    uint32_t idxA;
-    uint32_t idxB;
-    uint32_t idxC;
-
-    Triangle(uint32_t idxA, uint32_t idxB, uint32_t idxC) : idxA(idxA), idxB(idxB), idxC(idxC) {}
-
-    static const int VERTEX_COUNT = 3;
-};
 
 class Mesh {
 public:

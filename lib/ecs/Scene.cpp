@@ -15,3 +15,7 @@ void EntityScene::Update(float delta, UpdateContext& context) {
     for (auto &item : entities)
         item->Update(delta, context);
 }
+
+void EntityScene::RemoveEntities() {
+    entities.clear();
+}

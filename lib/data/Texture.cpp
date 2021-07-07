@@ -9,6 +9,8 @@
 
 #include <stb_image.h>
 
+extern std::string ConvertWideToNormal(std::wstring wide);
+
 Texture::Texture(VulkanCore* core, vk::Device& device, vk::Format format, vk::ImageAspectFlags aspectFlags) : core(core), device(&device), format(format), aspectFlags(aspectFlags) {}
 
 void Texture::LoadFromFile(const char *file, bool hasAlpha) {
@@ -55,6 +57,7 @@ void Texture::Create(int size, void *pixels) {
 //    imageInfo.setFlags(0);
 
     CHECK(device->createImage(&imageInfo, nullptr, &textureImage));
+    core->NameObject(textureImage, name + " Texture image");
 
     vk::MemoryRequirements memoryRequirements;
     device->getImageMemoryRequirements(textureImage, &memoryRequirements);
@@ -65,6 +68,7 @@ void Texture::Create(int size, void *pixels) {
 
     CHECK(device->allocateMemory(&allocInfo, nullptr, &textureImageMemory));
     device->bindImageMemory(textureImage, textureImageMemory, 0);
+    core->NameObject(textureImageMemory, name + " Texture image memory");
 
     if(pixels != nullptr) {
         core->TransitionImageLayout(textureImage, format, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
@@ -80,10 +84,16 @@ void Texture::Create(int size, void *pixels) {
 
 void Texture::CreateView() {
     textureView = core->CreateImageView(textureImage, format, aspectFlags);
+    core->NameObject(textureView, name + " Texture view");
 }
 
 void Texture::Dispose() {
+
+    if(textureView == VK_NULL_HANDLE)
+        return;
+
     device->destroyImageView(textureView);
+    textureView = VK_NULL_HANDLE;
     if(!manageMemory)
         return;
 
@@ -104,4 +114,15 @@ vk::Image& Texture::GetImage() {
 void Texture::SetSize(int width, int height) {
     this->width = width;
     this->height = height;
+}
+
+void Texture::Transition(vk::ImageLayout oldLayout, vk::ImageLayout newLayout) {
+    core->TransitionImageLayout(textureImage, format, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
+}
+void Texture::SetName(std::string name) {
+    this->name = name;
+}
+
+void Texture::SetName(std::wstring name) {
+    SetName(ConvertWideToNormal(name));
 }

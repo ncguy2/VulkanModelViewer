@@ -10,6 +10,8 @@
 #define DEBUG 1
 #endif
 
+#define USE_VK_MESH
+
 #ifdef DEBUG
 #include <core/VulkanCore.hpp>
 #include <data/Mesh.h>
@@ -22,11 +24,15 @@ void ShaderProgram::Cleanup() {
     for (auto &item : samplers)
         item.Dispose();
 
+    device->freeDescriptorSets(core->GetDescriptorPool(), descriptorSets);
     device->destroyDescriptorSetLayout(descriptorSetLayout);
 
     for (auto &item : shaderStages)
         item.Cleanup(device);
     shaderStages.clear();
+
+    device->destroyPipeline(pipeline);
+    device->destroyPipelineLayout(pipelineLayout);
 }
 
 ShaderProgram::ShaderProgram(VulkanCore *core, vk::Device &device) : core(core), device(&device), isCompiled(false) {
@@ -38,7 +44,7 @@ ShaderProgram::ShaderProgram(VulkanCore *core, vk::Device &device) : core(core),
     textureBound += textureBoundHandle = [](ShaderProgram *program, vk::ImageView view, int slot) {
         if (program->isCompiled)
             program->UpdateDescriptorSets();
-//            program->core->CompileShader(program);
+        //            program->core->CompileShader(program);
     };
     stageAdded += stageAddedHandle = [](ShaderProgram *program, ShaderStage stage) {
         if (program->isCompiled)
@@ -51,7 +57,7 @@ void ShaderProgram::AddStage(ShaderStage stage) {
     stageAdded(this, stage);
 }
 
-void ShaderProgram::Compile(vk::Extent2D &swapchainExtent, vk::Format &imageFormat, vk::DescriptorPool &descriptorPool, vk::RenderPass& renderPass) {
+void ShaderProgram::Compile(vk::Extent2D &swapchainExtent, vk::Format &imageFormat, vk::DescriptorPool &descriptorPool, vk::RenderPass &renderPass) {
     BuildDescriptorSetLayout();
     BuildDescriptorSets(descriptorPool, core->ImageCount(), core->GetUniformBuffers());
     BuildPipeline(swapchainExtent, renderPass);
@@ -79,6 +85,8 @@ void ShaderProgram::BuildDescriptorSetLayout() {
     layoutInfo.setBindings(bindings);
 
     CHECK(device->createDescriptorSetLayout(&layoutInfo, nullptr, &descriptorSetLayout));
+
+    core->NameObject(descriptorSetLayout, name + ", Descriptor Set Layout");
 }
 
 void ShaderProgram::BuildDescriptorSets(vk::DescriptorPool &descriptorPool, int imageCount, std::vector<vk::Buffer> uniformBuffers) {
@@ -90,12 +98,17 @@ void ShaderProgram::BuildDescriptorSets(vk::DescriptorPool &descriptorPool, int 
     descriptorSets.resize(imageCount);
     CHECK(device->allocateDescriptorSets(&allocInfo, descriptorSets.data()));
 
+    for(int i = 0; i < imageCount; i++) {
+        core->NameObject(descriptorSets[i], name + ", Descriptor Set " + std::to_string(i));
+    }
+
     this->imageCount = imageCount;
     this->uniformBuffers = uniformBuffers;
     UpdateDescriptorSets();
 }
 
 void ShaderProgram::UpdateDescriptorSets() {
+    device->waitIdle();
     for (size_t i = 0; i < imageCount; i++) {
         vk::DescriptorBufferInfo bufferInfo{};
         bufferInfo.setBuffer(uniformBuffers[i]);
@@ -141,7 +154,7 @@ void ShaderProgram::UpdateDescriptorSets() {
     }
 }
 
-void ShaderProgram::BuildPipeline(vk::Extent2D &extent, vk::RenderPass& renderPass) {
+void ShaderProgram::BuildPipeline(vk::Extent2D &extent, vk::RenderPass &renderPass) {
     std::vector<vk::PipelineShaderStageCreateInfo> infoVector;
     vk::PipelineShaderStageCreateInfo *shaderStageInfos;
     for (auto &item : shaderStages)
@@ -161,12 +174,10 @@ void ShaderProgram::BuildPipeline(vk::Extent2D &extent, vk::RenderPass& renderPa
     inputAssembly.setTopology(vk::PrimitiveTopology::eTriangleList);
     inputAssembly.setPrimitiveRestartEnable(VK_FALSE);
 
-    vk::Viewport viewport{};
     viewport.setX(0).setY(0);
     viewport.setWidth((float) extent.width).setHeight((float) extent.height);
     viewport.setMinDepth(0).setMaxDepth(1);
 
-    vk::Rect2D scissor{};
     scissor.setOffset({0, 0});
     scissor.setExtent(extent);
 
@@ -208,7 +219,7 @@ void ShaderProgram::BuildPipeline(vk::Extent2D &extent, vk::RenderPass& renderPa
 
     vk::DynamicState dynamicStates[] = {
             vk::DynamicState::eViewport,
-            vk::DynamicState::eLineWidth};
+            vk::DynamicState::eScissor};
 
     vk::PipelineDynamicStateCreateInfo dynamicState{};
     dynamicState.setDynamicStateCount(2);
@@ -218,16 +229,17 @@ void ShaderProgram::BuildPipeline(vk::Extent2D &extent, vk::RenderPass& renderPa
     pipelineLayoutInfo.setSetLayoutCount(1);
     pipelineLayoutInfo.setPSetLayouts(&descriptorSetLayout);
 
-    vk::PushConstantRange pushConstantInfo{};
-    pushConstantInfo.offset = 0;
-    pushConstantInfo.size = sizeof(MeshVertexPushConstants);
-    pushConstantInfo.stageFlags = vk::ShaderStageFlagBits::eVertex;
+//    std::array<vk::PushConstantRange, 1> pushConstantInfo{};
+//    pushConstantInfo[0].offset = 0;
+//    pushConstantInfo[0].size = sizeof(MeshVertexPushConstants);
+//    pushConstantInfo[0].stageFlags = vk::ShaderStageFlagBits::eVertex;
 
-    pipelineLayoutInfo.pushConstantRangeCount = 1;
-    pipelineLayoutInfo.pPushConstantRanges = &pushConstantInfo;
+    pipelineLayoutInfo.setPushConstantRanges(pushConstantInfo);
 
     if (device->createPipelineLayout(&pipelineLayoutInfo, nullptr, &pipelineLayout) != vk::Result::eSuccess)
         throw std::runtime_error("Failed to create pipeline layout");
+
+    core->NameObject(pipelineLayout, name + ", Pipeline Layout");
 
     vk::PipelineDepthStencilStateCreateInfo depthStencil{};
     depthStencil.depthTestEnable = VK_TRUE;
@@ -248,13 +260,15 @@ void ShaderProgram::BuildPipeline(vk::Extent2D &extent, vk::RenderPass& renderPa
     pipelineInfo.setPMultisampleState(&multisampling);
     pipelineInfo.setPDepthStencilState(&depthStencil);
     pipelineInfo.setPColorBlendState(&colourBlending);
-    //    pipelineInfo.setPDynamicState(&dynamicState);
+    pipelineInfo.setPDynamicState(&dynamicState);
     pipelineInfo.setLayout(pipelineLayout);
     pipelineInfo.setRenderPass(renderPass);
     pipelineInfo.setSubpass(0);
 
     if (device->createGraphicsPipelines(nullptr, 1, &pipelineInfo, nullptr, &pipeline) != vk::Result::eSuccess)
         throw std::runtime_error("Failed to create graphics pipeline");
+
+    core->NameObject(pipeline, name + ", Pipeline");
 }
 
 vk::Pipeline *ShaderProgram::GetPipeline() {
@@ -263,6 +277,8 @@ vk::Pipeline *ShaderProgram::GetPipeline() {
 
 void ShaderProgram::BindDescriptorSet(vk::CommandBuffer &buffer, vk::PipelineBindPoint bindPoint, unsigned int imageIndex) {
     buffer.bindDescriptorSets(bindPoint, pipelineLayout, 0, 1, &descriptorSets[imageIndex], 0, nullptr);
+    buffer.setViewport(0, viewport);
+    buffer.setScissor(0, scissor);
 }
 
 void ShaderProgram::AddSampler() {
@@ -285,8 +301,39 @@ void ShaderProgram::SetTexture(vk::ImageView imageView, int index) {
 vk::PipelineLayout &ShaderProgram::GetLayout() {
     return pipelineLayout;
 }
-void ShaderProgram::Recompile(VulkanCore* core) {
+void ShaderProgram::Recompile(VulkanCore *core) {
+    if(!descriptorSets.empty()) {
+        device->freeDescriptorSets(core->GetDescriptorPool(), descriptorSets);
+        descriptorSets.clear();
+    }
+
     device->destroyDescriptorSetLayout(descriptorSetLayout);
 
     core->CompileShader(this);
+}
+
+void ShaderProgram::SetViewport(vk::Viewport viewport) {
+    this->viewport = viewport;
+}
+
+void ShaderProgram::SetScissor(vk::Rect2D scissor) {
+    this->scissor = scissor;
+}
+
+void ShaderProgram::ResetScissor() {
+    this->scissor.setOffset({0, 0});
+    this->scissor.setExtent({
+            static_cast<uint32_t>(this->viewport.width),
+            static_cast<uint32_t>(this->viewport.height)});
+}
+void ShaderProgram::SetName(std::string name) {
+    this->name = name;
+}
+
+void ShaderProgram::AddPushConstant(int offset, int size, vk::ShaderStageFlags stageFlags) {
+    vk::PushConstantRange pcr{};
+    pcr.offset = offset;
+    pcr.size = size;
+    pcr.stageFlags = stageFlags;
+    pushConstantInfo.push_back(pcr);
 }

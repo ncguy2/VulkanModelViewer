@@ -5,14 +5,15 @@
 #ifndef GLMODELVIEWER_VULKANCORE_HPP
 #define GLMODELVIEWER_VULKANCORE_HPP
 
+#include <chrono>
 #include <core/Events.h>
+#include <data/Contexts.h>
 #include <data/RenderPass.h>
 #include <data/Shader.h>
 #include <glm/glm.hpp>
 #include <optional>
+#include <plugins/PluginManager.h>
 #include <vulkan/vulkan.hpp>
-#include <chrono>
-#include <data/Contexts.h>
 
 struct QueueFamilyIndices {
     std::optional<uint32_t> graphicsFamily;
@@ -41,17 +42,26 @@ public:
     typedef Delegate<VulkanCore*, uint32_t, uint32_t> SwapchainRecreated;
     typedef Delegate<VulkanCore*, std::shared_ptr<Mesh>> StaticMeshAdded;
     typedef Delegate<RendererContext&> Render;
+    typedef Delegate<std::vector<FilePath>> Drop;
 
     // Event Delegates
     SwapchainRecreated swapchainRecreated;
     StaticMeshAdded staticMeshAdded;
     Render render;
+    Drop drop;
 
     StaticMeshAdded::Signature staticMeshAddedHandle;
 
     std::shared_ptr<Camera> primaryCamera;
 
     vk::Device* GetDevicePtr();
+
+    void NameObject(uint64_t handle, vk::ObjectType type, std::string name);
+
+    template <typename T>
+    void NameObject(T obj, std::string name) {
+        NameObject((uint64_t) obj, obj.objectType, name);
+    }
 
 public:
     GLFWwindow* InitVulkan();
@@ -79,7 +89,7 @@ public:
     uint32_t FindMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties);
 
     void TransitionImageLayout(vk::Image& image, vk::Format format, vk::ImageLayout oldLayout, vk::ImageLayout newLayout);
-    void CopyBufferToImage(vk::Buffer& buffer, vk::Image& image, uint32_t width, uint32_t height);
+    void CopyBufferToImage(vk::Buffer& buffer, vk::Image& image, uint32_t width, uint32_t height, int offsetX = 0, int offsetY = 0);
     vk::ImageView CreateImageView(vk::Image& image, vk::Format format, vk::ImageAspectFlags aspectFlags);
     std::shared_ptr<ShaderProgram> CreateShaderProgram();
     void CompileShader(const std::shared_ptr<ShaderProgram>& shaderPtr);
@@ -94,6 +104,7 @@ public:
     void SetScreen(std::shared_ptr<Screen> newScreenPtr);
     void SetViewProj(uint32_t currentImage, glm::mat4& view, glm::mat4& proj);
     vk::Format swapchainImageFormat;
+    PluginManager pluginManager;
 
 protected:
     void CreateInstance();
