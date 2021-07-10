@@ -5,6 +5,8 @@
 #ifndef GLMODELVIEWER_MESHDATA_H
 #define GLMODELVIEWER_MESHDATA_H
 
+#define NOMINMAX
+
 #include <vector>
 #include <string>
 
@@ -61,6 +63,19 @@ struct Triangle {
     Triangle(uint32_t idxA, uint32_t idxB, uint32_t idxC) : idxA(idxA), idxB(idxB), idxC(idxC) {}
 
     static const int VERTEX_COUNT = 3;
+    
+    uint32_t min() const {
+        return std::min(idxA, std::min(idxB, idxC));
+    }
+    uint32_t max() const {
+        return std::max(idxA, std::max(idxB, idxC));
+    }
+
+    void offset(uint32_t offset) {
+        idxA += offset;
+        idxB += offset;
+        idxC += offset;
+    }
 };
 
 struct MeshData {
@@ -68,6 +83,7 @@ struct MeshData {
     std::vector<Vertex> vertices;
     std::vector<Triangle> indices;
     TextureString texturePath;
+    TextureString meshPath;
 };
 
 struct TextureData {

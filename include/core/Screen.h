@@ -26,7 +26,7 @@ public:
     bool IsCreated() const;
 
     virtual void Create();
-    virtual void Update(float delta) = 0;
+    virtual void Update(UpdateContext& context) = 0;
     virtual void Resize(int width, int height) = 0;
     virtual void Show() = 0;
     virtual void Hide() = 0;
@@ -44,7 +44,7 @@ protected:
 class ScreenAdapter : public Screen {
 public:
     void Create() override;
-    void Update(float delta) override;
+    void Update(UpdateContext& context) override;
     void Resize(int width, int height) override;
     void Show() override;
     void Hide() override;

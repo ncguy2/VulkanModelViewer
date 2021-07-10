@@ -18,12 +18,13 @@ class AbstractRenderer {
 public:
     virtual void Setup(RendererSetupContext& context);
     virtual void Render(RendererContext& context) = 0;
+    virtual void Dispose();
+    virtual void Resize(int width, int height);
 
-    vk::CommandBuffer GetCommandBuffer(unsigned int idx);
-    vk::CommandBuffer* GetCommandBufferPtr(unsigned int idx);
+    virtual const char* Name()=0;
 
 protected:
-    std::array<vk::CommandBuffer, MAX_FRAMES_IN_FLIGHT> commandBuffers;
+    RendererSetupContext setupContext;
 };
 
 #endif//GLMODELVIEWER_ABSTRACTRENDERER_H

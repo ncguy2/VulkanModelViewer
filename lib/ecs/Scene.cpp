@@ -7,6 +7,9 @@
 
 std::shared_ptr<Entity> EntityScene::CreateEntity() {
     std::shared_ptr<Entity> e = std::make_shared<Entity>();
+    e->transform.translation = glm::vec3(0, 0, 0);
+    e->transform.rotation = glm::quat(0, 0, 0, 1);
+    e->transform.scale = glm::vec3(1, 1, 1);
     entities.push_back(e);
     return e;
 }

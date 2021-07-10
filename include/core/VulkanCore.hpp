@@ -5,6 +5,9 @@
 #ifndef GLMODELVIEWER_VULKANCORE_HPP
 #define GLMODELVIEWER_VULKANCORE_HPP
 
+
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 #include <chrono>
 #include <core/Events.h>
 #include <data/Contexts.h>
@@ -14,6 +17,14 @@
 #include <optional>
 #include <plugins/PluginManager.h>
 #include <vulkan/vulkan.hpp>
+#include <map>
+
+struct InputState {
+    int key;
+    bool pressed;
+    // TODO implement
+    bool justUpdated;
+};
 
 struct QueueFamilyIndices {
     std::optional<uint32_t> graphicsFamily;
@@ -60,11 +71,13 @@ public:
 
     template <typename T>
     void NameObject(T obj, std::string name) {
-        NameObject((uint64_t) obj, obj.objectType, name);
+        NameObject(GET_VK_HANDLE(obj), obj.objectType, name);
     }
 
+    void MouseButton(int button, int action);
+
 public:
-    GLFWwindow* InitVulkan();
+    GLFWwindow* InitVulkan(HWND handle = nullptr);
     void Cleanup();
 
     void MainLoop();
@@ -97,16 +110,26 @@ public:
     std::shared_ptr<Texture> CreateTexture(vk::Format format, vk::ImageAspectFlags aspectFlags);
     std::shared_ptr<Texture> CreateDepthTexture(vk::Extent2D size);
 
+    void OnMouse(double xpos, double ypos);
+    Delegate<VulkanCore*, double, double> onMouse;
+
     void OnKey(int key, int scancode, int action, int mods);
     Delegate<VulkanCore*, int, int, int, int> onKey;
     GLFWwindow* window;
 
     void SetScreen(std::shared_ptr<Screen> newScreenPtr);
-    void SetViewProj(uint32_t currentImage, glm::mat4& view, glm::mat4& proj);
+    void SetViewProj(uint32_t currentImage, glm::mat4& view, glm::mat4& proj, glm::vec4& cameraData);
     vk::Format swapchainImageFormat;
     PluginManager pluginManager;
+    glm::dvec2 mouseInput;
+
+    void SetShouldClose() const;
+    void NotifyDrop(std::vector<FilePath>& filesDropped);
 
 protected:
+    bool hasDrop = false;
+    std::vector<FilePath> dropPayload;
+
     void CreateInstance();
     std::vector<const char*> getRequiredExtensions();
     bool checkValidationLayerSupport();
@@ -184,6 +207,22 @@ protected:
 
     std::chrono::time_point<std::chrono::steady_clock> previousTime;
 
+    std::map<int, InputState> keyInputs;
+    std::map<int, InputState> buttonInputs;
+
+public:
+    void Key(int key, int scancode, int action, int mods);
+
+    bool IsKeyPressed(int key);
+    bool IsButtonPressed(int button);
+
+    void SetModelInfo(std::vector<std::string> lines);
+    bool SetModelInfoFunc(void* funcPtr);
+
+    void* modelInfoFuncPtr_raw = nullptr;
+    typedef void* (*ModelInfoFunc)(int, int, const char*);
+    ModelInfoFunc modelInfoFuncPtr = nullptr;
+    std::vector<const char*> modelInfo;
 };
 
 #endif//GLMODELVIEWER_VULKANCORE_HPP

@@ -8,8 +8,23 @@
 #include <cstdio>
 #include <data/Texture.h>
 #include <core/VulkanCore.hpp>
+#include <Logging.h>
+#include <sys/stat.h>
 
 extern std::string ConvertWideToNormal(std::wstring wide);
+extern std::string assetRoot;
+
+inline bool exists(const std::wstring& name) {
+    FILE* file;
+    _wfopen_s(&file, name.c_str(), L"rb");
+    if(file) {
+        fclose(file);
+        Logging::Log("File exists");
+        return true;
+    }
+    Logging::Log("File does not exist");
+    return false;
+}
 
 void PluginManager::Initialise(VulkanCore* core) {
     this->core = core;
@@ -19,17 +34,19 @@ void PluginManager::Initialise(VulkanCore* core) {
 }
 
 void PluginManager::LoadFromDirectory(const char *directory) {
-    std::filesystem::directory_iterator pluginDirectory(directory);
+    std::string p = assetRoot + directory;
+    LOG("Loading from directory " + p);
+    std::filesystem::directory_iterator pluginDirectory(p);
 
     for(auto& file : pluginDirectory) {
         std::filesystem::path path = file.path();
-        std::cout << "Path: " << path.string() << std::endl;
-        std::cout << " -- Extension: " << path.extension() << std::endl;
+        Logging::Get() << "Path: " << path.string() << std::endl;
+        Logging::Get() << " -- Extension: " << path.extension() << std::endl;
 
         if(!HasSuffix(path, LIBRARY_SUFFIX))
             continue;
 
-        std::cout << " -- Is plugin" << std::endl;
+        Logging::Get() << " -- Is plugin" << std::endl;
 
         FilePath fp = path.wstring();
 
@@ -50,6 +67,9 @@ bool PluginManager::HasSuffix(std::filesystem::path path, const char *extension)
 }
 
 bool PluginManager::SupportsFileType(FileDataType dataType, FilePath& filename) {
+    if(!exists(filename))
+        return false;
+
     for (auto &item : pluginHosts) {
         if(item->Get()->SupportsFileType(dataType, filename))
             return true;
@@ -58,6 +78,9 @@ bool PluginManager::SupportsFileType(FileDataType dataType, FilePath& filename) 
 }
 
 ModelLoader *PluginManager::GetModelLoader(FilePath& filename) {
+    if(!exists(filename))
+        return nullptr;
+
     for (auto &item : pluginHosts) {
         if(item->Get()->SupportsFileType(FileDataType::Model_Type, filename))
             return item->Get()->GetModelLoader(filename);
@@ -67,6 +90,9 @@ ModelLoader *PluginManager::GetModelLoader(FilePath& filename) {
 }
 
 TextureLoader *PluginManager::GetTextureLoader(FilePath& filename) {
+    if(!exists(filename))
+        return nullptr;
+
     for (auto &item : pluginHosts) {
         if(item->Get()->SupportsFileType(FileDataType::Texture_Type, filename))
             return item->Get()->GetTextureLoader(filename);
@@ -83,21 +109,25 @@ std::vector<MeshData> PluginManager::LoadMeshes(FilePath& filename) {
     ModelLoader* loader = GetModelLoader(filename);
     if(loader == nullptr)
         return std::vector<MeshData>();
-    return loader->Load(filename);
+    LOG_LN("ModelLoader instance found");
+    auto data = loader->Load(filename);
+    LOG_LN("ModelLoader instance able to load from file");
+    for (auto &item : data)
+        item.meshPath = filename;
+    return data;
 }
 
 std::shared_ptr<Texture> PluginManager::LoadTexture(FilePath& filename) {
     TextureLoader* loader = GetTextureLoader(filename);
     if(loader == nullptr) {
 //        fprintf(stdout, "Unable to load texture at %ls\n", filename.wstring().c_str());
-        std::cout << "Unable to load texture at " << CAST_WSTR_STR(filename) << std::endl;
+        Logging::Get() << "Unable to load texture at " << CAST_WSTR_STR(filename) << std::endl;
         fflush(stdout);
         return defaultTexture;
     }
 
     TextureData data = loader->Load(filename);
     if(data.data == nullptr) {
-        std::cout << "Failed to load " << CAST_WSTR_STR(filename) << std::endl;
         return defaultTexture;
     }
 
@@ -119,4 +149,11 @@ bool PluginManager::IsDefaultTexture(std::shared_ptr<Texture> &tex) {
 
 std::shared_ptr<Texture> PluginManager::GetDefaultTexture() {
     return this->defaultTexture;
+}
+
+void PluginManager::LoadMeshesAsync(FilePath &filename, PluginManager::MeshAsync::Signature callback) {
+    ModelLoader* loader = GetModelLoader(filename);
+    if(loader == nullptr)
+        return;
+    loader->LoadAsync(filename, callback);
 }

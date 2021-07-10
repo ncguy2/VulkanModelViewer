@@ -13,16 +13,6 @@ void StdTexPlugin::Dispose() {
     texLoader.reset();
 }
 
-bool IsStringWide(std::string string) {
-
-    for(int i = string.length() - 1; i >= 0; i--) {
-        if(string[i] == '\0')
-            return true;
-    }
-
-    return false;
-}
-
 bool StdTexPlugin::SupportsFileType(FileDataType dataType, FilePath& filename) {
     if(dataType != Texture_Type)
         return false;

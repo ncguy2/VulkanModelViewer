@@ -5,19 +5,9 @@
 #include <data/render/AbstractRenderer.h>
 
 void AbstractRenderer::Setup(RendererSetupContext& context) {
-    // Allocate command buffers up-front
-    vk::CommandBufferAllocateInfo allocInfo{};
-    allocInfo.commandPool = *context.commandPool;
-    allocInfo.level = vk::CommandBufferLevel::ePrimary;
-    allocInfo.commandBufferCount = MAX_FRAMES_IN_FLIGHT;
-
-    CHECK(context.device->allocateCommandBuffers(&allocInfo, commandBuffers.data()));
+    setupContext = context;
 }
 
-vk::CommandBuffer AbstractRenderer::GetCommandBuffer(unsigned int idx) {
-    return commandBuffers[idx & MAX_FRAMES_IN_FLIGHT];
-}
+void AbstractRenderer::Dispose() {}
 
-vk::CommandBuffer *AbstractRenderer::GetCommandBufferPtr(unsigned int idx) {
-    return &commandBuffers[idx % MAX_FRAMES_IN_FLIGHT];
-}
+void AbstractRenderer::Resize(int width, int height) {}

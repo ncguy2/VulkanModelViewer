@@ -7,10 +7,11 @@
 
 #include <vulkan/vulkan.hpp>
 #include <data/Contexts.h>
+#include <ecs/Entity.h>
 #include <memory>
 #include <vector>
 
-class Entity;
+
 class VulkanCore;
 class Component;
 
@@ -23,7 +24,17 @@ public:
     template<typename T, typename =
     std::enable_if_t<std::is_base_of_v<Component, std::remove_reference_t<T>>>>
     void RemoveEntitiesWith() {
-        // TODO implement this
+//        std::erase(std::remove_if(entities.begin(), entities.end(),
+//          [](const std::shared_ptr<Entity>& ePtr) {
+//            return ePtr->HasComponent<T>();
+//          }), entities.end());
+
+        auto it = entities.begin();
+        while (it != entities.end()) {
+            if((*it)->HasComponent<T>())
+                it = entities.erase(it);
+            else ++it;
+        }
     }
 
     void RemoveEntities();

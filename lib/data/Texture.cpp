@@ -89,7 +89,7 @@ void Texture::CreateView() {
 
 void Texture::Dispose() {
 
-    if(textureView == VK_NULL_HANDLE)
+    if(GET_VK_HANDLE(textureView) == 0)
         return;
 
     device->destroyImageView(textureView);

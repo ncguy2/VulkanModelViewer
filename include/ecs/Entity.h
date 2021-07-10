@@ -14,6 +14,8 @@
 
 class VulkanCore;
 
+#define C_GET_KEY(T) typeid(T).hash_code()
+
 class Entity {
 public:
     Entity();
@@ -22,10 +24,16 @@ public:
 
     template<typename T, typename =
     std::enable_if_t<std::is_base_of_v<Component, std::remove_reference_t<T>>>>
+    bool HasComponent() {
+        return components.count(C_GET_KEY(T));
+    }
+
+    template<typename T, typename =
+    std::enable_if_t<std::is_base_of_v<Component, std::remove_reference_t<T>>>>
     std::shared_ptr<T> AddComponent(std::initializer_list<T> initList) {
         std::shared_ptr<T> ptr = std::make_shared<T>(initList);
         ptr->Attach(this);
-        components[typeid(T).hash_code()] = ptr;
+        components[C_GET_KEY(T)] = ptr;
         return ptr;
     }
 
@@ -34,14 +42,16 @@ public:
     std::shared_ptr<T> AddComponent() {
         std::shared_ptr<T> ptr = std::make_shared<T>();
         ptr->Attach(this);
-        components[typeid(T).hash_code()] = ptr;
+        components[C_GET_KEY(T)] = ptr;
         return ptr;
     }
 
     template<typename T, typename =
     std::enable_if_t<std::is_base_of_v<Component, std::remove_reference_t<T>>>>
     T* GetComponent() {
-        return (T*) components[typeid(T).hash_code()].get();
+        if(HasComponent<T>())
+            return (T*) components[C_GET_KEY(T)].get();
+        return nullptr;
     }
 
     void ForEachComponent(const std::function<void(std::shared_ptr<Component>)>& func);

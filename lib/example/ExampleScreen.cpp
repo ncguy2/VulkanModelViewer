@@ -2,16 +2,21 @@
 // Created by Guy on 15/06/2021.
 //
 
+#include <Logging.h>
+
 #include <example/ExampleScreen.h>
 #include <core/VulkanCore.hpp>
 
 #include <GLFW/glfw3.h>
 #include <data/Mesh.h>
 #include <data/Shader.h>
-#include <data/render/BlitRenderer.h>
 #include <data/render/MeshRenderer.h>
+#include <data/render/GridRenderer.h>
 #include <ecs/Entity.h>
+#include <data/vk/Camera.h>
 #include <ecs/components/CameraComponent.h>
+#include <ecs/components/FlyCamComponent.h>
+#include <ecs/components/NameComponent.h>
 #include <ecs/components/MeshComponent.h>
 #include <ecs/components/MeshRendererComponent.h>
 #include <map>
@@ -22,13 +27,33 @@
 
 extern std::vector<char> ReadFile(const std::string& filename);
 
-void ExampleScreen::Update(float delta) {
-    t += delta;
+void ExampleScreen::Update(UpdateContext& context) {
+    t += context.delta;
 
-    for (auto &mesh : meshes) {
-        mesh->transform = glm::rotate(meshes[0]->transform, delta * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-        mesh->data = glm::vec4(fmod((t / 10.0f), 1.0f), 1.0f, 1.0f, 1.0f);
+    if(context.GetKey(GLFW_KEY_KP_ADD))
+        gridScale += context.delta * 10;
+    if(context.GetKey(GLFW_KEY_KP_SUBTRACT))
+        gridScale -= context.delta * 10;
+
+    if(gridScale < 1)
+        gridScale = 1;
+
+    if(context.GetKey(GLFW_KEY_R)) {
+        gridScale = (gridScale + (10.0f - gridScale) * (context.delta * 10));
     }
+//        gridScale = glm::lerp(gridScale, 10.0f, context.delta * 10);
+
+    if(cameraPtr) {
+        context.cameraData.x = cameraPtr->GetNear();
+        context.cameraData.y = cameraPtr->GetFar();
+        context.cameraData.z = gridScale;
+    }
+
+//    for (auto &mesh : meshes) {
+//        mesh->transform = glm::rotate(meshes[0]->transform, delta * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+//        mesh->data = glm::vec4(fmod((t / 10.0f), 1.0f), 1.0f, 1.0f, 1.0f);
+//    }
+
 }
 
 void ExampleScreen::Resize(int width, int height) {
@@ -37,101 +62,78 @@ void ExampleScreen::Resize(int width, int height) {
 
     for (auto &item : shaders)
         item->Recompile(components.core);
+
+    rendererStack.Resize(width, height);
+
+    PerspectiveSettings ps{};
+    ps.width = width;
+    ps.height = height;
+    ps.fov = 90;
+    ps.nearPlane = 0.01f;
+    ps.farPlane = 100;
+
+    if(cameraPtr)
+        cameraPtr->SetPerspective(ps);
 }
 
 void ExampleScreen::Show() {
-    offscreenColourTextures.resize(MAX_FRAMES_IN_FLIGHT);
-    offscreenDepthTextures.resize(MAX_FRAMES_IN_FLIGHT);
-    offscreenRenderPass = RenderPass::CreateStandardColourDepthPass(components.core, vk::Extent2D{static_cast<uint32_t>(width), static_cast<uint32_t>(height)}, offscreenColourTextures, offscreenDepthTextures, offscreenDepthTextures.size());
-
-//    std::vector<char> vertShaderCode = ReadFile("assets/shaders/sample/sample.vert");
-//    std::vector<char> fragShaderCode = ReadFile("assets/shaders/sample/sample.frag");
-
     FilePath texPath = L"F:\\Linked\\Downloads\\texture.jpg";
     components.pluginManager->SetDefaultTexture(components.pluginManager->LoadTexture(texPath));
-
-
-//    mesh->SetVertices({
-//                              Vertex({  -0.5f, -0.5f,   0.0f }, { 1.0f, 0.0f, 0.0f }, {1.0f, 0.0f}),
-//                              Vertex({   0.5f, -0.5f,   0.0f }, { 0.0f, 1.0f, 0.0f }, {0.0f, 0.0f}),
-//                              Vertex({   0.5f,  0.5f,   0.0f }, { 0.0f, 0.0f, 1.0f }, {0.0f, 1.0f}),
-//                              Vertex({  -0.5f,  0.5f,   0.0f }, { 1.0f, 1.0f, 1.0f }, {1.0f, 1.0f}),
-//
-//                              Vertex({  -0.5f, -0.5f,  -0.5f }, { 1.0f, 0.0f, 0.0f }, {1.0f, 0.0f}),
-//                              Vertex({   0.5f, -0.5f,  -0.5f }, { 0.0f, 1.0f, 0.0f }, {0.0f, 0.0f}),
-//                              Vertex({   0.5f,  0.5f,  -0.5f }, { 0.0f, 0.0f, 1.0f }, {0.0f, 1.0f}),
-//                              Vertex({  -0.5f,  0.5f,  -0.5f }, { 1.0f, 1.0f, 1.0f }, {1.0f, 1.0f}),
-//                      });
-//    mesh->SetIndices({
-//                             Triangle(0, 1, 2),
-//                             Triangle(2, 3, 0),
-//
-//                             Triangle(4, 5, 6),
-//                             Triangle(6, 7, 4),
-//                     });
-
-//    std::filesystem::path path = std::filesystem::u8path(R"(J:/Character Meshes/Genshin Impact/Eula/Eula.pmx)");
-//    auto texPath = R"(F:\Linked\Downloads\texture.jpg)";
-//    Plugins::ModelLoader *loader = components.core->pluginManager.GetLoader(FileDataType::Model_Type, path);
-//    auto data = loader->Load(path)[0];
 
     RendererSetupContext setupContext{};
     setupContext.core = components.core;
     setupContext.device = components.device;
     setupContext.commandPool = components.commandPool;
-    setupContext.textureSet.push_back(offscreenColourTextures[0]->GetView());
 
-    meshRenderer = std::make_shared<MeshRenderer>();
-    meshRenderer->Setup(setupContext);
+    rendererStack.AddRenderer<MeshRenderer>();
+    rendererStack.AddRenderer<GridRenderer>();
+    rendererStack.Setup(setupContext);
 
     dropFunc = [this](std::vector<FilePath> paths) {
-//        if(paths.size() == 1) {
-//            if(paths[0].ends_with(L".png")) {
-//                auto selMeshPtr = GetSelectedMesh();
-//                if(selMeshPtr) {
-//                    std::cout << "Overriding texture in slot " << selectedMeshIdx << " with texture at path: " << CAST_WSTR_STR(paths[0]) << std::endl;
-//                    auto texture = components.core->pluginManager.LoadTexture(paths[0]);
-//                    selMeshPtr->GetShaderProgram()->SetTexture(texture->GetView(), 0);
-//                    textures.push_back(texture);
-//                    return;
-//                }
-//            }
-//        }
-
         auto start = std::chrono::steady_clock::now();
         this->CleanupMeshes();
         auto cleanupTime = std::chrono::steady_clock::now();
-        this->LoadMeshes(paths[0]);
+      std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> convert;
+
+      Logging::Get() << "Loading mesh from " << convert.to_bytes(paths[0]) << std::endl;
+
+        auto data = components.pluginManager->LoadMeshes(paths[0]);
+        LOG_LN("Meshes loaded from file: " + std::to_string(data.size()));
+        int idx = 0;
+        for (auto &datum : data) {
+            LOG_LN("Loading mesh from data[" + std::to_string(idx++) + "]");
+            LoadMesh(datum);
+        }
+      LOG_LN("LoadMesh Success");
+
         auto end = std::chrono::steady_clock::now();
 
-        std::cout << "Mesh cleanup took " << std::chrono::duration_cast<std::chrono::milliseconds>(cleanupTime - start).count() << "ms" << std::endl;
-        std::cout << "Mesh creation took " << std::chrono::duration_cast<std::chrono::milliseconds>(end - cleanupTime).count() << "ms" << std::endl;
+      Logging::Get() << "Mesh cleanup took " << std::chrono::duration_cast<std::chrono::milliseconds>(cleanupTime - start).count() << "ms" << std::endl;
+      Logging::Get() << "Mesh creation took " << std::chrono::duration_cast<std::chrono::milliseconds>(end - cleanupTime).count() << "ms" << std::endl;
+
+      std::vector<std::string> lines(4);
+      lines[0] = std::string("Mesh path: " + convert.to_bytes(meshPath));
+      lines[1] = std::string("Mesh count: " + std::to_string(meshes.size()));
+      lines[2] = std::string("Texture count: " + std::to_string(textures.size()));
+      lines[3] = std::string("Mesh creation took " + std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(end - cleanupTime).count()) + "ms");
+
+      components.core->SetModelInfo(lines);
+
     };
 
     renderFunc = [this](RendererContext& context) {
-//        RenderPass* origPass = context.renderPass;
-
-
-
-//        context.renderPass = offscreenRenderPass.get();
         context.fbo = context.renderPass->Get(context.bufferIdx).GetVK();
-        this->meshRenderer->Render(context);
-
-//        context.renderPass = origPass;
-//        context.fbo = origPass->Get(context.bufferIdx).GetVK();
-//        blitRenderer->SetTexture(0, offscreenColourTextures[(context.bufferIdx + 1) % offscreenColourTextures.size()].get());
-//        this->blitRenderer->Render(context);
-
-        context.commandBuffers.push_back(this->meshRenderer->GetCommandBuffer(context.bufferIdx));
-//        context.commandBuffers.push_back(this->blitRenderer->GetCommandBuffer(context.bufferIdx));
+        rendererStack.Render(context);
     };
+
+    cameraEntity = scene.CreateEntity();
+    cameraEntity->AddComponent<NameComponent>()->name = "Camera";
+    cameraEntity->AddComponent<FlyCamComponent>();
+    cameraPtr = cameraEntity->AddComponent<CameraComponent>()->GetCameraPtr();
+    cameraEntity->transform.translation = glm::vec3(5, 5, 5);
 
     components.core->drop += dropFunc;
     components.core->render += renderFunc;
-
-//    camera = scene.CreateEntity();
-//    camera->AddComponent<CameraComponent>();
-
 }
 void ExampleScreen::Hide() {
     components.core->render -= renderFunc;
@@ -139,27 +141,18 @@ void ExampleScreen::Hide() {
 }
 
 void ExampleScreen::Dispose() {
+    rendererStack.Dispose();
     CleanupMeshes();
     components.pluginManager->GetDefaultTexture()->Dispose();
-
-    for (auto &item : offscreenColourTextures)
-        item->Dispose();
-
-    for (auto &item : offscreenDepthTextures)
-        item->Dispose();
-
-    offscreenRenderPass->Dispose();
 }
 
 void ExampleScreen::OnKey(int key, int scancode, int action, int mods) {
     if(action != GLFW_PRESS)
         return;
 
-    if(key < GLFW_KEY_A || key > GLFW_KEY_Z)
-        return;
-
-    selectedMeshIdx = key - GLFW_KEY_A;
-    std::cout << "Selected mesh idx: " << selectedMeshIdx << std::endl;
+    if(key >= GLFW_KEY_1 && key <= GLFW_KEY_9) {
+        rendererStack.Toggle(key - GLFW_KEY_1);
+    }
 }
 
 void ExampleScreen::AddMesh(const std::shared_ptr<Mesh>& mesh) {
@@ -180,8 +173,7 @@ void ExampleScreen::CleanupMeshes() {
             item->Dispose();
     }
 
-//    scene.RemoveEntitiesWith<MeshRendererComponent>();
-    scene.RemoveEntities();
+    scene.RemoveEntitiesWith<MeshRendererComponent>();
     meshes.clear();
     shaders.clear();
     textures.clear();
@@ -197,47 +189,60 @@ Plugins::FilePath GetParent(Plugins::FilePath path) {
     return path.substr(0, idx);
 }
 
-void ExampleScreen::LoadMeshes(Plugins::FilePath path) {
-    std::vector<char> vertShaderCode = ReadFile("assets/shaders/sample/sample.vert");
-    std::vector<char> fragShaderCode = ReadFile("assets/shaders/sample/sample.frag");
-
-    auto data = components.pluginManager->LoadMeshes(path);
-
-    for (const auto &datum : data) {
-        auto mesh = std::make_shared<Mesh>();
-        mesh->transform = datum.transform;
-        mesh->SetVertices(datum.vertices);
-        mesh->SetIndices(datum.indices);
-
-        Plugins::FilePath tex = GetParent(path);
-        tex += L"/";
-        tex += datum.texturePath;
-
-        auto texture = components.core->pluginManager.LoadTexture(tex);
-        auto shader = components.core->CreateShaderProgram();
-        shader->AddStage(ShaderStage("main", vk::ShaderStageFlagBits::eVertex, vertShaderCode));
-        shader->AddStage(ShaderStage("main", vk::ShaderStageFlagBits::eFragment, fragShaderCode));
-        shader->AddPushConstant(0, sizeof(MeshVertexPushConstants), vk::ShaderStageFlagBits::eVertex);
-        shader->AddSamplers(1);
-        shader->SetTexture(texture->GetView(), 0);
-        static int shaderCounter = 0;
-        shader->SetName("Shader " + std::to_string(shaderCounter++));
-        components.core->CompileShader(shader);
-        textures.push_back(texture);
-        shaders.push_back(shader);
-
-        mesh->SetShaderProgram(shader);
-        AddMesh(mesh);
-
-        auto entity = scene.CreateEntity();
-        entity->AddComponent<MeshComponent>()->mesh = mesh;
-        entity->AddComponent<MeshRendererComponent>();
-
-        entities.push_back(entity);
-    }
-}
 std::shared_ptr<Mesh> ExampleScreen::GetSelectedMesh() {
     if(selectedMeshIdx < 0 || selectedMeshIdx >= meshes.size())
         return nullptr;
     return meshes[selectedMeshIdx];
 }
+void ExampleScreen::LoadMesh(MeshData& datum) {
+
+    meshPath = datum.meshPath;
+
+    // TODO make dependant on material parameters
+    std::vector<char> vertShaderCode = ReadFile("assets/shaders/sample/sample.vert");
+    std::vector<char> fragShaderCode = ReadFile("assets/shaders/sample/sample.frag");
+
+    auto mesh = std::make_shared<Mesh>();
+    mesh->transform = datum.transform;
+    mesh->SetVertices(datum.vertices);
+    mesh->SetIndices(datum.indices);
+
+    Plugins::FilePath tex = GetParent(datum.meshPath);
+    tex += L"/";
+    tex += datum.texturePath;
+
+    auto texture = components.core->pluginManager.LoadTexture(tex);
+    auto shader = components.core->CreateShaderProgram();
+    shader->AddStage(ShaderStage("main", vk::ShaderStageFlagBits::eVertex, vertShaderCode));
+    shader->AddStage(ShaderStage("main", vk::ShaderStageFlagBits::eFragment, fragShaderCode));
+
+    VertexDescription vertDesc;
+
+    vertDesc.setInputRate(vk::VertexInputRate::eVertex);
+    int stride = sizeof(Vertex);
+    vertDesc.setStride(stride);
+    vertDesc.Add(vk::Format::eR32G32B32Sfloat, offsetof(Vertex, pos));
+    vertDesc.Add(vk::Format::eR32G32B32Sfloat, offsetof(Vertex, normal));
+    vertDesc.Add(vk::Format::eR32G32Sfloat, offsetof(Vertex, uv));
+
+    shader->AddVertexDescription(vertDesc);
+
+    shader->AddPushConstant(0, sizeof(MeshVertexPushConstants), vk::ShaderStageFlagBits::eVertex);
+    shader->AddSamplers(1);
+    shader->SetTexture(texture->GetView(), 0);
+    static int shaderCounter = 0;
+    shader->SetName("Shader " + std::to_string(shaderCounter++));
+    components.core->CompileShader(shader);
+    textures.push_back(texture);
+    shaders.push_back(shader);
+
+    mesh->SetShaderProgram(shader);
+    AddMesh(mesh);
+
+    auto entity = scene.CreateEntity();
+    entity->AddComponent<MeshComponent>()->mesh = mesh;
+    entity->AddComponent<MeshRendererComponent>();
+
+    entities.push_back(entity);
+}
+

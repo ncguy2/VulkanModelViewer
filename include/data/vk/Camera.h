@@ -36,14 +36,22 @@ class Camera {
 public:
     Camera();
 
-    void Render(vk::Device& device, vk::Queue& queue, vk::Semaphore& waitSemaphore, vk::Semaphore& signalSemaphore, vk::Fence& fence, std::vector<vk::CommandBuffer> commandBuffers);
-
     glm::mat4 GetProjectionMatrix();
 
     void SetPerspective(PerspectiveSettings settings);
     void SetOrthographic(OrthographicSettings settings);
 
+    void Update();
+
+    float GetNear();
+    float GetFar();
+
+
 protected:
+
+    glm::vec3 position;
+    glm::vec3 forward;
+
     CameraProjection activeProjection;
     PerspectiveSettings perspective;
     OrthographicSettings orthographic;

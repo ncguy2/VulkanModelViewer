@@ -12,6 +12,7 @@
 #include "ShaderStage.h"
 #include "Texture.h"
 #include "TextureSampler.h"
+#include "VertexDescription.h"
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.hpp>
 
@@ -24,6 +25,7 @@ struct UniformBufferObject {
 //    glm::mat4 model;
     glm::mat4 view;
     glm::mat4 proj;
+    glm::vec4 cameraData;
 };
 
 class VulkanCore;
@@ -72,6 +74,8 @@ public:
 
     void AddPushConstant(int offset, int size, vk::ShaderStageFlags stageFlags);
 
+    void AddVertexDescription(VertexDescription desc);
+
 protected:
     void BuildDescriptorSetLayout();
     void BuildDescriptorSets(vk::DescriptorPool& descriptorPool, int imageCount, std::vector<vk::Buffer> uniformBuffers);
@@ -97,6 +101,8 @@ protected:
     int imageCount;
     std::vector<vk::Buffer> uniformBuffers;
     std::vector<vk::PushConstantRange> pushConstantInfo;
+
+    std::vector<VertexDescription> vertDescriptions;
 };
 
 #endif//GLMODELVIEWER_SHADER_H

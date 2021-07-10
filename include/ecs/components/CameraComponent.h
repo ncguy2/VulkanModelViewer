@@ -14,6 +14,8 @@ class CameraComponent : public Component {
 public:
     void Update(float delta, UpdateContext& context) override;
 
+    Camera* GetCameraPtr();
+
 protected:
     Camera camera;
 

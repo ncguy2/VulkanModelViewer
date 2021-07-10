@@ -22,6 +22,7 @@ public: \
 #include <kaitai/kaitaistruct.h>
 #include <utility>
 #include <codecvt>
+#include <core/Events.h>
 
 #if defined(WIN32) || defined(_WIN32) || defined(_WIN64)
 
@@ -195,6 +196,7 @@ namespace Plugins {
     public:
         explicit ModelLoader(Plugin *plugin) : plugin(plugin) {}
         virtual std::vector<MeshData> Load(FilePath& filename)=0;
+        virtual void LoadAsync(FilePath& filename, Delegate<MeshData&>::Signature callback)=0;
 
     protected:
         Plugin* plugin;

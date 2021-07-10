@@ -12,7 +12,7 @@ class VulkanCore;
 
 class Component {
 public:
-    virtual void Update(float delta, UpdateContext& context) = 0;
+    virtual void Update(float delta, UpdateContext& context) {}
 
     void Attach(Entity* entity) { attachedEntity = entity; }
     void Detach() { Attach(nullptr); }

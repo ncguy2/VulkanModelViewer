@@ -4,14 +4,20 @@
 
 #include <ecs/Entity.h>
 #include <ecs/Component.h>
+#include <iostream>
+#include <Logging.h>
 
 void Entity::Update(float delta, UpdateContext& context) {
     FOR_EACH_COMPONENT(component->Update(delta, context));
 }
 
 void Entity::ForEachComponent(const std::function<void(std::shared_ptr<Component>)>& func) {
-    for (auto &item : components)
-        func(item.second);
+    for (auto &item : components) {
+        if (item.second)
+            func(item.second);
+        else
+            Logging::Get() << "Entity has dead component reference" << std::endl;
+    }
 }
 
 Entity::Entity() {

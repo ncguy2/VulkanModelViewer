@@ -25,13 +25,12 @@ void ScreenAdapter::Create() {
     Screen::Create();
 }
 
-void ScreenAdapter::Update(float delta) {}
+void ScreenAdapter::Update(UpdateContext& context) {}
 void ScreenAdapter::Resize(int width, int height) {}
 void ScreenAdapter::Show() {}
 void ScreenAdapter::Hide() {}
 void ScreenAdapter::Dispose() {}
 void ScreenAdapter::OnKey(int key, int scancode, int action, int mods) {}
-
 
 void ScreenUtils::RecordMeshes(int idx, vk::CommandBuffer &buffer, std::vector<std::shared_ptr<Mesh>>& meshes, CoreScreenComponents& components) {
     std::map<std::shared_ptr<ShaderProgram>, std::vector<std::shared_ptr<Mesh>>> meshMap;

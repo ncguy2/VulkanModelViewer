@@ -20,5 +20,6 @@
 #define CAST_WSTR_STR(wstr) std::string((char*) wstr.data(), wstr.size() * 2)
 
 
+#define GET_VK_HANDLE(obj) reinterpret_cast<uint64_t&>(obj)
 
 #endif//GLMODELVIEWER_PCH_H

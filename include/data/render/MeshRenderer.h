@@ -10,6 +10,7 @@
 class MeshRenderer : public AbstractRenderer {
 public:
     void Render(RendererContext &context) override;
+    const char *Name() override;
 };
 
 #endif//GLMODELVIEWER_MESHRENDERER_H

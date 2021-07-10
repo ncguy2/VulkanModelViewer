@@ -10,6 +10,7 @@
 #include <memory>
 #include <vector>
 #include <plugins/api/Plugin.h>
+#include <core/Events.h>
 
 //namespace Plugins {
 //    class ModelLoader;
@@ -24,6 +25,9 @@ class VulkanCore;
 
 class PluginManager {
 public:
+
+    typedef Delegate<MeshData&> MeshAsync;
+
     void Initialise(VulkanCore* core);
     void Dispose();
 
@@ -37,6 +41,8 @@ public:
     void SetDefaultTexture(std::shared_ptr<Texture> texture);
     bool IsDefaultTexture(std::shared_ptr<Texture> &type);
     std::shared_ptr<Texture> GetDefaultTexture();
+
+    void LoadMeshesAsync(FilePath& filename, MeshAsync::Signature callback);
 
 private:
     void LoadFromDirectory(const char* directory);

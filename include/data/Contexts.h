@@ -16,11 +16,17 @@ class Camera;
 struct UpdateContext {
     glm::mat4 view;
     glm::mat4 proj;
+    glm::vec4 cameraData;
     std::vector<std::shared_ptr<Mesh>> meshesToRender;
+    VulkanCore* core{};
     Camera* camera;
+    glm::dvec2 mouseInput;
+    float delta;
 
     void PushMesh(std::shared_ptr<Mesh> mesh);
     void Reset();
+    bool GetKey(int keycode);
+    bool GetButton(int button);
 };
 
 struct RendererSetupContext {
@@ -39,6 +45,7 @@ struct RendererContext {
     vk::Extent2D extent{};
     UpdateContext data;
 
+    vk::CommandBuffer buffer;
     std::vector<vk::CommandBuffer> commandBuffers;
 
     // TODO TEMP

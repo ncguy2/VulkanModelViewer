@@ -14,8 +14,6 @@ namespace Kaitai {
     extern T Read(const FilePath& path);
 }
 
-extern bool IsStringWide(std::string string);
-
 TextureData StdTexLoader::Load(FilePath& filename) {
 
     if(cache.contains(filename))

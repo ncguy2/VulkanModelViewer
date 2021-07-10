@@ -25,6 +25,7 @@ void ShaderProgram::Cleanup() {
         item.Dispose();
 
     device->freeDescriptorSets(core->GetDescriptorPool(), descriptorSets);
+    descriptorSets.clear();
     device->destroyDescriptorSetLayout(descriptorSetLayout);
 
     for (auto &item : shaderStages)
@@ -50,6 +51,8 @@ ShaderProgram::ShaderProgram(VulkanCore *core, vk::Device &device) : core(core),
         if (program->isCompiled)
             program->core->CompileShader(program);
     };
+
+
 }
 
 void ShaderProgram::AddStage(ShaderStage stage) {
@@ -162,13 +165,32 @@ void ShaderProgram::BuildPipeline(vk::Extent2D &extent, vk::RenderPass &renderPa
     //    std::copy(infoVector.begin(), infoVector.end(), shaderStageInfos);
     shaderStageInfos = &infoVector[0];
 
-    auto bindingDescription = Vertex::getBindingDescription();
-    auto attributeDescription = Vertex::getAttributeDescriptions();
+//    auto bindingDescription = Vertex::getBindingDescription();
+//    auto attributeDescription = Vertex::getAttributeDescriptions();
+
+    std::vector<VertexDescriptor> vd(vertDescriptions.size());
+    for(int i = 0; i < vertDescriptions.size(); i++)
+        vd[i] = vertDescriptions[i].Convert(i);
+
+    std::vector<vk::VertexInputBindingDescription> bindingDescriptions;
+    std::vector<vk::VertexInputAttributeDescription> attributeDescriptions;
+
+    int bindingDescriptionCount = 0;
+    for (auto &item : vd) {
+        bindingDescriptionCount++;
+        bindingDescriptions.push_back(item.binding);
+        attributeDescriptions.insert(attributeDescriptions.end(), item.attrs.begin(), item.attrs.end());
+    }
 
     vk::PipelineVertexInputStateCreateInfo vertexInputInfo{};
-    vertexInputInfo.setVertexBindingDescriptionCount(1);
-    vertexInputInfo.setPVertexBindingDescriptions(&bindingDescription);
-    vertexInputInfo.setVertexAttributeDescriptions(attributeDescription);
+    vertexInputInfo.setVertexBindingDescriptionCount(bindingDescriptionCount);
+    if(bindingDescriptionCount == 0) {
+        vertexInputInfo.setVertexBindingDescriptions(nullptr);
+        vertexInputInfo.setVertexAttributeDescriptions(nullptr);
+    }else {
+        vertexInputInfo.setVertexBindingDescriptions(bindingDescriptions);
+        vertexInputInfo.setVertexAttributeDescriptions(attributeDescriptions);
+    }
 
     vk::PipelineInputAssemblyStateCreateInfo inputAssembly{};
     inputAssembly.setTopology(vk::PrimitiveTopology::eTriangleList);
@@ -302,10 +324,10 @@ vk::PipelineLayout &ShaderProgram::GetLayout() {
     return pipelineLayout;
 }
 void ShaderProgram::Recompile(VulkanCore *core) {
-    if(!descriptorSets.empty()) {
-        device->freeDescriptorSets(core->GetDescriptorPool(), descriptorSets);
-        descriptorSets.clear();
-    }
+//    if(!descriptorSets.empty()) {
+//        device->freeDescriptorSets(core->GetDescriptorPool(), descriptorSets);
+//        descriptorSets.clear();
+//    }
 
     device->destroyDescriptorSetLayout(descriptorSetLayout);
 
@@ -336,4 +358,8 @@ void ShaderProgram::AddPushConstant(int offset, int size, vk::ShaderStageFlags s
     pcr.size = size;
     pcr.stageFlags = stageFlags;
     pushConstantInfo.push_back(pcr);
+}
+
+void ShaderProgram::AddVertexDescription(VertexDescription desc) {
+    vertDescriptions.push_back(desc);
 }
