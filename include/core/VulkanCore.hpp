@@ -18,6 +18,7 @@
 #include <plugins/PluginManager.h>
 #include <vulkan/vulkan.hpp>
 #include <map>
+#include <data/DataSmoother.h>
 
 struct InputState {
     int key;
@@ -210,6 +211,8 @@ protected:
     std::map<int, InputState> keyInputs;
     std::map<int, InputState> buttonInputs;
 
+    DataSmoother<unsigned int> fpsSmoother;
+
 public:
     void Key(int key, int scancode, int action, int mods);
 
@@ -223,6 +226,7 @@ public:
     typedef void* (*ModelInfoFunc)(int, int, const char*);
     ModelInfoFunc modelInfoFuncPtr = nullptr;
     std::vector<const char*> modelInfo;
+    unsigned int GetFPS(bool smoothed);
 };
 
 #endif//GLMODELVIEWER_VULKANCORE_HPP

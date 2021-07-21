@@ -11,6 +11,13 @@
 
 void Start(HWND hwnd);
 
+enum FunctionIds : uint8_t {
+    Signal = 0,
+    ModelInfo = 1,
+    MetadataSource = 2,
+    MetadataClear = 3
+};
+
 extern "C" {
     // Control
     __declspec(dllexport) void SetAssetRoot(const char* path);
@@ -22,8 +29,18 @@ extern "C" {
     __declspec(dllexport) void Key(int keycode, int action);
     __declspec(dllexport) void Drop(int pathCount, const char** paths);
 
+    __declspec(dllexport) void SetRegistryValue_ulong(const char* path, uint64_t value);
+    __declspec(dllexport) void SetRegistryValue_int(const char* path, int value);
+    __declspec(dllexport) void SetRegistryValue_bool(const char* path, bool value);
+    __declspec(dllexport) void SetRegistryValue_float(const char* path, float value);
+    __declspec(dllexport) void SetRegistryValue_string(const char* path, const char* value);
+
     // Outputs
-    __declspec(dllexport) void SetModelInfoFunc(void* funcPtr);
+    __declspec(dllexport) uint64_t GetRegistryValue_ulong(const char* path);
+    __declspec(dllexport) unsigned int FPS(bool smoothed);
+
+    // Functions
+    __declspec(dllexport) bool SetFunctionPointer(FunctionIds function, void* ptr);
 }
 
 #endif//GLMODELVIEWER_STARTUP_H

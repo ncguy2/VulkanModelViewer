@@ -36,7 +36,7 @@
 
 #ifdef NDEBUG
 #define IN_DEBUG(x)
-const bool enableValidationLayers = true;
+const bool enableValidationLayers = false;
 #else
 #define IN_DEBUG(x) x,
 const bool enableValidationLayers = true;
@@ -177,9 +177,11 @@ void VulkanCore::PopulateDebugMessengerCreateInfo(vk::DebugUtilsMessengerCreateI
 }
 
 void VulkanCore::CreateInstance() {
+    LOG_LN("Checking validation layer support");
     if (enableValidationLayers && !checkValidationLayerSupport())
         throw std::runtime_error("Validation layers requested, but not available");
 
+    LOG_LN("Creating app info");
     vk::ApplicationInfo appInfo{};
     appInfo.setPApplicationName("VK Model Viewer");
     appInfo.setApplicationVersion(VK_MAKE_VERSION(1, 0, 0));
@@ -187,15 +189,18 @@ void VulkanCore::CreateInstance() {
     appInfo.setEngineVersion(VK_MAKE_VERSION(1, 0, 0));
     appInfo.setApiVersion(VK_API_VERSION_1_2);
 
+    LOG_LN("Creating instance info");
     vk::InstanceCreateInfo instanceCreateInfo{};
     instanceCreateInfo.setPApplicationInfo(&appInfo);
 
+    LOG_LN("Fetching required extensions");
     auto extensions = getRequiredExtensions();
     instanceCreateInfo.setEnabledExtensionCount(extensions.size());
     instanceCreateInfo.setPpEnabledExtensionNames(extensions.data());
 
     instanceCreateInfo.setEnabledLayerCount(0);
 
+    LOG_LN("Initialising debug info");
     vk::DebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
     if (enableValidationLayers) {
         instanceCreateInfo.setPEnabledLayerNames(validationLayers);
@@ -207,6 +212,7 @@ void VulkanCore::CreateInstance() {
         instanceCreateInfo.setEnabledLayerCount(0);
     }
 
+    LOG_LN("Creating instance");
     vk::Result result = vk::createInstance(&instanceCreateInfo, nullptr, &instance);
     if (result != vk::Result::eSuccess)
         throw std::runtime_error("Failed to create vk::Instance");
@@ -239,15 +245,6 @@ GLFWwindow *VulkanCore::InitVulkan(HWND handle) {
         glfwTerminate();
         return nullptr;
     }
-
-    auto hwnd = glfwGetWin32Window(window);
-    auto hinstance = GetModuleHandle(nullptr);
-    LOG_LN("Window: " + std::to_string((unsigned long long) hwnd));
-    LOG_LN("Handle: " + std::to_string((unsigned long long) hinstance));
-
-    int w, h;
-    glfwGetWindowSize(window, &w, &h);
-    LOG_LN("Window size: {" + std::to_string(w) + ", " + std::to_string(h) + "}");
 
     glfwMakeContextCurrent(window);
     glfwSetWindowUserPointer(window, this);
@@ -630,6 +627,8 @@ void VulkanCore::DrawFrame() {
     currentTime = std::chrono::high_resolution_clock::now();
     float deltaTime = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - previousTime).count();
     previousTime = currentTime;
+
+    fpsSmoother.Plot((unsigned int) round(1 / deltaTime));
 
     EntityScene *scene;
     UpdateContext updateContext;
@@ -1116,12 +1115,16 @@ void VulkanCore::SetShouldClose() const {
 }
 
 void VulkanCore::Key(int key, int scancode, int action, int mods) {
-    keyInputs[key].key = key;
-    keyInputs[key].pressed = action == GLFW_PRESS;
+    if(action == GLFW_PRESS || action == GLFW_RELEASE) {
+        keyInputs[key].key = key;
+        keyInputs[key].pressed = action == GLFW_PRESS;
+    }
 }
 void VulkanCore::MouseButton(int button, int action) {
-    buttonInputs[button].key = button;
-    buttonInputs[button].pressed = action == GLFW_PRESS;
+    if(action == GLFW_PRESS || action == GLFW_RELEASE) {
+        buttonInputs[button].key = button;
+        buttonInputs[button].pressed = action == GLFW_PRESS;
+    }
 }
 bool VulkanCore::IsKeyPressed(int key) {
     return keyInputs[key].pressed;
@@ -1152,4 +1155,9 @@ bool VulkanCore::SetModelInfoFunc(void* funcPtr) {
 void VulkanCore::NotifyDrop(std::vector<FilePath>& files) {
     dropPayload = files;
     hasDrop = true;
+}
+unsigned int VulkanCore::GetFPS(bool smoothed) {
+    if(smoothed)
+        return fpsSmoother.Smooth();
+    return fpsSmoother.GetLatest();
 }

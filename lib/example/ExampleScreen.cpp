@@ -24,8 +24,11 @@
 #include <plugins/api/Plugin.h>
 #include <iostream>
 #include <chrono>
+#include <interop/InteropHost.h>
+#include <interop/MetadataRecord.h>
 
 extern std::vector<char> ReadFile(const std::string& filename);
+extern InteropHost interop;
 
 void ExampleScreen::Update(UpdateContext& context) {
     t += context.delta;
@@ -77,7 +80,7 @@ void ExampleScreen::Resize(int width, int height) {
 }
 
 void ExampleScreen::Show() {
-    FilePath texPath = L"F:\\Linked\\Downloads\\texture.jpg";
+    FilePath texPath = L"default-texture.png";
     components.pluginManager->SetDefaultTexture(components.pluginManager->LoadTexture(texPath));
 
     RendererSetupContext setupContext{};
@@ -119,6 +122,19 @@ void ExampleScreen::Show() {
 
       components.core->SetModelInfo(lines);
 
+      metadata.ClearRecords();
+
+      Record<Records::MeshData>* r = new Record<Records::MeshData>();
+      r->type = RecordType::ModelData;
+      r->size = sizeof(Records::MeshData);
+      r->data.meshCount = meshes.size();
+      r->data.textureCount = textures.size();
+      r->data.meshCreationTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - cleanupTime).count();
+//      r.data.meshPath = convert.to_bytes(meshPath).c_str();
+
+      interop.Call_MetadataSource(r);
+
+      delete r;
     };
 
     renderFunc = [this](RendererContext& context) {
@@ -143,7 +159,11 @@ void ExampleScreen::Hide() {
 void ExampleScreen::Dispose() {
     rendererStack.Dispose();
     CleanupMeshes();
-    components.pluginManager->GetDefaultTexture()->Dispose();
+    auto texPtr = components.pluginManager->GetDefaultTexture();
+    if(texPtr) {
+        texPtr->Dispose();
+        texPtr = nullptr;
+    }
 }
 
 void ExampleScreen::OnKey(int key, int scancode, int action, int mods) {
@@ -217,7 +237,6 @@ void ExampleScreen::LoadMesh(MeshData& datum) {
     shader->AddStage(ShaderStage("main", vk::ShaderStageFlagBits::eFragment, fragShaderCode));
 
     VertexDescription vertDesc;
-
     vertDesc.setInputRate(vk::VertexInputRate::eVertex);
     int stride = sizeof(Vertex);
     vertDesc.setStride(stride);
@@ -228,6 +247,7 @@ void ExampleScreen::LoadMesh(MeshData& datum) {
     shader->AddVertexDescription(vertDesc);
 
     shader->AddPushConstant(0, sizeof(MeshVertexPushConstants), vk::ShaderStageFlagBits::eVertex);
+    shader->AddPushConstant(sizeof(MeshVertexPushConstants), sizeof(LightParameters), vk::ShaderStageFlagBits::eFragment);
     shader->AddSamplers(1);
     shader->SetTexture(texture->GetView(), 0);
     static int shaderCounter = 0;

@@ -2,9 +2,9 @@
 #extension GL_ARB_separate_shader_objects : enable
 
 layout (binding = 0) uniform UniformBufferObject {
-//    mat4 model;
     mat4 view;
     mat4 proj;
+    vec4 cameraData;
 } ubo;
 
 layout (push_constant) uniform constants {
@@ -20,10 +20,13 @@ layout (location = 2) in vec2 inUv;
 layout (location = 0) out vec3 outNormal;
 layout (location = 1) out vec2 outUv;
 layout (location = 2) out vec4 outData;
+layout (location = 3) out vec3 outPosition;
 
 void main() {
-    gl_Position = ubo.proj * ubo.view * PushConstants.model * vec4(inPosition, 1.0);
-    outNormal = inNormal;
+    vec4 p = PushConstants.model * vec4(inPosition, 1.0);
+    gl_Position = ubo.proj * ubo.view * p;
+    outPosition = p.xyz;
+    outNormal = mat3(transpose(inverse(PushConstants.model))) * inNormal;
     outUv = inUv;
     outData = PushConstants.data;
 }

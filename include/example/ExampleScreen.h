@@ -13,6 +13,7 @@
 #include <mutex>
 #include <plugins/api/Plugin.h>
 #include <queue>
+#include <interop/MetadataSet.h>
 
 class MeshRenderer;
 class GridRenderer;
@@ -58,6 +59,8 @@ protected:
     std::queue<MeshData> meshQueue;
     int meshesToLoad;
     FilePath meshPath;
+
+    MetadataSet metadata;
 };
 
 #endif//GLMODELVIEWER_EXAMPLESCREEN_H

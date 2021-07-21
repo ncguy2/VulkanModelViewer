@@ -47,10 +47,10 @@ public:
     float GetFar();
 
 
-protected:
-
     glm::vec3 position;
     glm::vec3 forward;
+
+protected:
 
     CameraProjection activeProjection;
     PerspectiveSettings perspective;

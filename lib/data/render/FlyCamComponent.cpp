@@ -92,4 +92,5 @@ void FlyCamComponent::Update(float delta, UpdateContext &context) {
 //    std::cout << "Direction: {" << direction.x << ", " << direction.y << ", " << direction.z << "}" << std::endl;
 //    t->SetForward(direction);
     camdir = direction;
+
 }

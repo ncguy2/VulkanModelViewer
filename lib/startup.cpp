@@ -7,6 +7,10 @@
 #define WIN32_LEAN_AND_MEAN
 #include <GLFW/glfw3.h>
 #include <Logging.h>
+#include <core/ConfigRegistry.h>
+#include <interop/InteropHost.h>
+#include <startup.h>
+
 
 extern void framebufferResizeCallback(GLFWwindow *window, int width, int height);
 extern void dropCallback(GLFWwindow *window, int droppedPathCount, const char **paths);
@@ -15,6 +19,8 @@ extern void cursorPosCallback(GLFWwindow* window, double xpos, double ypos);
 extern void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
 
 std::string assetRoot;
+
+ConfigRegistry registry;
 
 static short int keycodes[512];
 static short int scancodes[GLFW_KEY_LAST + 1];
@@ -57,20 +63,32 @@ std::vector<char> ReadFile(const std::string& filename) {
 VulkanCore* coreInst;
 void* modelInfoFuncPtr;
 
+InteropHost interop;
+
 void Start(HWND hwnd) {
-    createKeyTables();
-    Logging::Init();
+    try{
+        createKeyTables();
+        Logging::Init();
 
-    VulkanCore core;
-    core.InitVulkan(hwnd);
-    coreInst = &core;
+        VulkanCore core;
+        core.InitVulkan(hwnd);
+        coreInst = &core;
 
-    core.SetModelInfoFunc(modelInfoFuncPtr);
+        core.SetModelInfoFunc(modelInfoFuncPtr);
 
-    std::shared_ptr<ExampleScreen> screen = std::make_shared<ExampleScreen>();
-    core.SetScreen(screen);
-    core.MainLoop();
-    core.Cleanup();
+        std::shared_ptr<ExampleScreen> screen = std::make_shared<ExampleScreen>();
+        core.SetScreen(screen);
+        core.MainLoop();
+        core.Cleanup();
+    }catch(std::runtime_error exc) {
+        Logging::Log(std::string(exc.what()));
+        coreInst->Cleanup();
+        throw;
+    }catch(...) {
+        Logging::Log("Unknown error");
+        coreInst->Cleanup();
+        throw;
+    }
 }
 
 __declspec(dllexport) void StartExtern(HWND hwnd) {
@@ -85,26 +103,6 @@ __declspec(dllexport) void Log(const char* msg) {
     Logging::Log(std::string(msg) + "\n");
 }
 
-__declspec(dllexport) void Key(int keycode, int action) {
-    if(coreInst == nullptr)
-        return;
-    // TODO populate scancode and mods
-    int k = keycodes[(short) keycode];
-    Logging::Log("Scancode: " + std::to_string(keycode) + ", keycode: " + std::to_string(k) + "\n");
-    keyCallback(coreInst->window, k, 0, action, 0);
-}
-__declspec(dllexport) void Mouse(double x, double y) {
-    if(coreInst == nullptr)
-        return;
-    cursorPosCallback(coreInst->window, x, y);
-}
-
-__declspec(dllexport) void Resize(int width, int height) {
-    if(coreInst == nullptr)
-        return;
-    framebufferResizeCallback(coreInst->window, width, height);
-}
-
 __declspec(dllexport) void SetAssetRoot(const char* path) {
     assetRoot = std::string(path);
     std::replace(assetRoot.begin(), assetRoot.end(), '\\', '/');
@@ -113,26 +111,12 @@ __declspec(dllexport) void SetAssetRoot(const char* path) {
         assetRoot += "/";
 }
 
-__declspec(dllexport) void MouseButton(int button, bool pressed) {
+__declspec(dllexport) void Key(int keycode, int action) {
     if(coreInst == nullptr)
         return;
-    mouseButtonCallback(coreInst->window, button, (int) pressed, 0);
-}
-
-__declspec(dllexport) void DropSingle(unsigned char* bytes) {
-    if(coreInst == nullptr)
-        return;
-
-
-    std::string s(reinterpret_cast<char*>(bytes), sizeof(bytes));
-    std::wstring w(reinterpret_cast<wchar_t*>(bytes), sizeof(bytes) / 2);
-
-    Logging::Log("Drop path 0: " + s + "\n");
-    Logging::Log(L"Drop path 0: " + w + L"\n");
-
-    dropCallback(coreInst->window, 1, new const char*[] {
-            s.c_str()
-            });
+    int k = keycodes[(short) keycode];
+    Logging::Log("Scancode: " + std::to_string(keycode) + ", keycode: " + std::to_string(k) + "\n");
+    keyCallback(coreInst->window, k, 0, action, 0);
 }
 
 __declspec(dllexport) void Drop(int pathCount, const char** paths) {
@@ -147,17 +131,27 @@ __declspec(dllexport) void Drop(int pathCount, const char** paths) {
     dropCallback(coreInst->window, pathCount, paths);
 }
 
-__declspec(dllexport) bool SetModelInfoFunc(void* funcPtr) {
-//    if(coreInst == nullptr)
-//        return false;
-//
-//    return coreInst->SetModelInfoFunc(funcPtr);
-
-    modelInfoFuncPtr = funcPtr;
-
-    return true;
+__declspec(dllexport) void SetRegistryValue_ulong(const char* path, uint64_t value) {
+    registry.Set(path, value);
 }
 
+__declspec(dllexport) uint64_t GetRegistryValue_ulong(const char *path) {
+    return registry.Get(path, 0).ulong;
+}
+
+__declspec(dllexport) unsigned int FPS(bool smoothed) {
+    return coreInst->GetFPS(smoothed);
+}
+
+__declspec(dllexport) bool SetFunctionPointer(FunctionIds function, void *ptr) {
+    switch(function) {
+        FUNC_REGISTER(Signal);
+        FUNC_REGISTER(ModelInfo);
+        FUNC_REGISTER(MetadataSource);
+        FUNC_REGISTER(MetadataClear);
+    }
+    return false;
+}
 
 static void createKeyTables() {
     int scancode;

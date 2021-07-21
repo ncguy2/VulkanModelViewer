@@ -23,6 +23,9 @@ void CameraComponent::Update(float delta, UpdateContext& context) {
     context.view = view;
     context.proj = proj;
 
+    camera.position = position;
+    camera.forward = direction;
+
     context.camera = &camera;
 }
 Camera *CameraComponent::GetCameraPtr() {

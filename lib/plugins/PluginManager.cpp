@@ -14,6 +14,18 @@
 extern std::string ConvertWideToNormal(std::wstring wide);
 extern std::string assetRoot;
 
+inline bool exists(const std::string& name) {
+    FILE* file;
+    fopen_s(&file, name.c_str(), "rb");
+    if(file) {
+        fclose(file);
+        Logging::Log("File exists");
+        return true;
+    }
+    Logging::Log("File does not exist");
+    return false;
+}
+
 inline bool exists(const std::wstring& name) {
     FILE* file;
     _wfopen_s(&file, name.c_str(), L"rb");
@@ -35,6 +47,12 @@ void PluginManager::Initialise(VulkanCore* core) {
 
 void PluginManager::LoadFromDirectory(const char *directory) {
     std::string p = assetRoot + directory;
+
+    if(!std::filesystem::exists(p)) {
+        LOG_LN("Plugin directory \"" + p + "\" doesn't exist")
+        return;
+    }
+
     LOG("Loading from directory " + p);
     std::filesystem::directory_iterator pluginDirectory(p);
 
