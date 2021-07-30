@@ -9,7 +9,12 @@
 #ifdef NDEBUG
 #define CHECK(x) x
 #else
-#define CHECK(x) if(x != vk::Result::eSuccess) throw std::runtime_error(#x);
+#define CHECK(x)                                                                                \
+    {                                                                                           \
+        vk::Result res = x;                                                                     \
+        if (res != vk::Result::eSuccess)                                                        \
+            throw std::runtime_error(vk::to_string(res) + ": " + #x);                           \
+    }
 #endif
 
 #ifndef MAX_FRAMES_IN_FLIGHT

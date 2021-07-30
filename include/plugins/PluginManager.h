@@ -5,12 +5,12 @@
 #ifndef GLMODELVIEWER_PLUGINMANAGER_H
 #define GLMODELVIEWER_PLUGINMANAGER_H
 
-#include <data/MeshData.h>
+#include <core/Events.h>
 #include <filesystem>
 #include <memory>
-#include <vector>
+#include <plugins/api/MeshData.h>
 #include <plugins/api/Plugin.h>
-#include <core/Events.h>
+#include <vector>
 
 //namespace Plugins {
 //    class ModelLoader;
@@ -42,10 +42,8 @@ public:
     bool IsDefaultTexture(std::shared_ptr<Texture> &type);
     std::shared_ptr<Texture> GetDefaultTexture();
 
-    void LoadMeshesAsync(FilePath& filename, MeshAsync::Signature callback);
-
 private:
-    void LoadFromDirectory(const char* directory);
+    void LoadFromDirectory(const char* directory, int maxDepth = 1);
     bool HasSuffix(std::filesystem::path path, const char* extension);
 
     std::shared_ptr<Texture> defaultTexture;

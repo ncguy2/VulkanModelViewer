@@ -6,7 +6,7 @@ include(cmake/VulkanTools.cmake)
 set(CMAKE_CXX_STANDARD 20)
 set(EXTERNAL_SOURCES )
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
-set(ENABLED_PLUGINS "PMX;STDTEX")
+set(ENABLED_PLUGINS "PMX;STDTEX;OBJ")
 option(BUILD_LIB "Whether to build the viewer as a dll" ON)
 
 message("CMAKE_MODULE_PATH: ${CMAKE_MODULE_PATH}")
@@ -45,7 +45,7 @@ if(WIN32)
 endif(WIN32)
 
 
-set(HEADERS include/data/Mesh.h include/data/Shader.h include/data/VertexAttribute.h include/pch.h include/core/VulkanCore.hpp include/data/ShaderStage.h include/data/vk/CommandBuffer.h include/core/Events.h include/data/Texture.h include/data/TextureSampler.h include/data/RenderPipeline.h include/data/RenderPass.h include/data/Framebuffer.h include/core/VulkanDeviceObject.h include/core/Screen.h include/example/ExampleScreen.h include/ecs/Transform.h include/ecs/Entity.h include/ecs/Component.h include/ecs/components/CameraComponent.h include/ecs/Scene.h include/data/vk/FBO.h include/data/vk/Camera.h include/data/render/AbstractRenderer.h include/data/render/MeshRenderer.h include/data/Contexts.h include/ecs/components/MeshComponent.h include/ecs/components/MeshRendererComponent.h include/scene2d/Stage.h include/scene2d/Actor.h include/scene2d/Group.h include/scene2d/Scene2d.h include/scene2d/Event.h include/scene2d/EventListener.h include/plugins/api/Plugin.h include/plugins/PluginHost.h include/data/MeshData.h include/plugins/PluginManager.h include/data/TextureAtlas.h include/data/render/GridRenderer.h include/data/render/RendererStack.h include/data/VertexDescription.h include/ecs/components/FlyCamComponent.h include/ecs/components/NameComponent.h include/startup.h include/Logging.h include/core/ConfigRegistry.h include/core/Utils.h include/data/DataSmoother.h include/data/LimitedQueue.h include/interop/InteropHost.h include/interop/MetadataRecord.h include/interop/MetadataSet.h)
+set(HEADERS include/data/Mesh.h include/data/Shader.h include/data/VertexAttribute.h include/pch.h include/core/VulkanCore.hpp include/data/ShaderStage.h include/data/vk/CommandBuffer.h include/core/Events.h include/data/Texture.h include/data/TextureSampler.h include/data/RenderPipeline.h include/data/RenderPass.h include/data/Framebuffer.h include/core/VulkanDeviceObject.h include/core/Screen.h include/example/ExampleScreen.h include/ecs/Transform.h include/ecs/Entity.h include/ecs/Component.h include/ecs/components/CameraComponent.h include/ecs/Scene.h include/data/vk/FBO.h include/data/vk/Camera.h include/data/render/AbstractRenderer.h include/data/render/MeshRenderer.h include/data/Contexts.h include/ecs/components/MeshComponent.h include/ecs/components/MeshRendererComponent.h include/scene2d/Stage.h include/scene2d/Actor.h include/scene2d/Group.h include/scene2d/Scene2d.h include/scene2d/Event.h include/scene2d/EventListener.h include/plugins/api/Plugin.h include/plugins/PluginHost.h include/plugins/api/MeshData.h include/plugins/PluginManager.h include/data/TextureAtlas.h include/data/render/GridRenderer.h include/data/render/RendererStack.h include/data/VertexDescription.h include/ecs/components/FlyCamComponent.h include/ecs/components/NameComponent.h include/startup.h include/Logging.h include/core/ConfigRegistry.h include/core/Utils.h include/data/DataSmoother.h include/data/LimitedQueue.h include/interop/InteropHost.h include/interop/MetadataRecord.h include/interop/MetadataSet.h)
 set(SOURCES lib/data/Mesh.cpp lib/data/Shader.cpp lib/data/VertexAttribute.cpp lib/core/VulkanCore.cpp lib/data/ShaderStage.cpp lib/data/vk/CommandBuffer.cpp lib/data/Texture.cpp lib/data/TextureSampler.cpp lib/data/Framebuffer.cpp lib/data/RenderPass.cpp lib/core/Screen.cpp lib/example/ExampleScreen.cpp lib/ecs/Entity.cpp lib/ecs/components/CameraComponent.cpp lib/ecs/Scene.cpp lib/data/vk/FBO.cpp lib/data/vk/Camera.cpp lib/data/render/AbstractRenderer.cpp lib/data/render/MeshRenderer.cpp lib/data/Contexts.cpp lib/ecs/components/MeshComponent.cpp lib/ecs/components/MeshRendererComponent.cpp lib/scene2d/Event.cpp lib/plugins/PluginHost.cpp lib/plugins/PluginManager.cpp lib/data/TextureAtlas.cpp lib/data/render/GridRenderer.cpp lib/data/render/RendererStack.cpp lib/data/VertexDescription.cpp lib/data/render/FlyCamComponent.cpp lib/startup.cpp lib/Logging.cpp lib/core/ConfigRegistry.cpp lib/core/Utils.cpp lib/interop/InteropHost.cpp lib/interop/MetadataSet.cpp)
 
 if(BUILD_LIB)
@@ -59,6 +59,9 @@ if("STDTEX" IN_LIST ENABLED_PLUGINS)
 endif()
 if("PMX" IN_LIST ENABLED_PLUGINS)
     add_plugin(GLModelViewer "plugins/PMX" PMXPlugin)
+endif()
+if("OBJ" IN_LIST ENABLED_PLUGINS)
+    add_plugin(GLModelViewer "plugins/Obj" ObjPlugin)
 endif()
 
 add_dependencies(GLModelViewer glfw)

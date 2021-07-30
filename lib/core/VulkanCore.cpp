@@ -845,11 +845,11 @@ void VulkanCore::CreateDescriptorPool() {
 
     std::array<vk::DescriptorPoolSize, 1> poolSizes{};
     poolSizes[0].setType(vk::DescriptorType::eMutableVALVE);
-    poolSizes[0].setDescriptorCount(16);
+    poolSizes[0].setDescriptorCount(64);
 
     vk::DescriptorPoolCreateInfo poolInfo{};
     poolInfo.setPoolSizes(poolSizes);
-    poolInfo.setMaxSets(1024);
+    poolInfo.setMaxSets(4096);
     poolInfo.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet;
 
     CHECK(device.createDescriptorPool(&poolInfo, nullptr, &descriptorPool));

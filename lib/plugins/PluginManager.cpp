@@ -40,12 +40,10 @@ inline bool exists(const std::wstring& name) {
 
 void PluginManager::Initialise(VulkanCore* core) {
     this->core = core;
-    LoadFromDirectory("plugins");
-    LoadFromDirectory("plugins/PMX");
-    LoadFromDirectory("plugins/StandardTextures");
+    LoadFromDirectory("plugins", 1);
 }
 
-void PluginManager::LoadFromDirectory(const char *directory) {
+void PluginManager::LoadFromDirectory(const char *directory, int maxDepth) {
     std::string p = assetRoot + directory;
 
     if(!std::filesystem::exists(p)) {
@@ -58,6 +56,13 @@ void PluginManager::LoadFromDirectory(const char *directory) {
 
     for(auto& file : pluginDirectory) {
         std::filesystem::path path = file.path();
+
+        if(file.is_directory()) {
+            if(maxDepth > 0)
+                LoadFromDirectory(path.string().c_str(), maxDepth - 1);
+            continue;
+        }
+
         Logging::Get() << "Path: " << path.string() << std::endl;
         Logging::Get() << " -- Extension: " << path.extension() << std::endl;
 
@@ -167,11 +172,4 @@ bool PluginManager::IsDefaultTexture(std::shared_ptr<Texture> &tex) {
 
 std::shared_ptr<Texture> PluginManager::GetDefaultTexture() {
     return this->defaultTexture;
-}
-
-void PluginManager::LoadMeshesAsync(FilePath &filename, PluginManager::MeshAsync::Signature callback) {
-    ModelLoader* loader = GetModelLoader(filename);
-    if(loader == nullptr)
-        return;
-    loader->LoadAsync(filename, callback);
 }

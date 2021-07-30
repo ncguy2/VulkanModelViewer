@@ -5,7 +5,7 @@
 #ifndef GLMODELVIEWER_MESH_H
 #define GLMODELVIEWER_MESH_H
 
-#include "MeshData.h"
+#include "plugins/api/MeshData.h"
 
 #include "Shader.h"
 #include "ecs/Transform.h"
